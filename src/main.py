@@ -620,6 +620,8 @@ def body_organize(win, frm, say):
     cnt_lbl.pack(side="right")
     legend = ttk.Label(frm, text="", font=("Segoe UI", 8), wraplength=520)
     legend.pack(anchor="w")
+    ttk.Label(frm, text="GESER: klik-tahan thumbnail → seret ke posisi baru → lepas.  Klik = pilih • Ctrl+klik = banyak • Shift+klik = rentang.",
+              font=("Segoe UI", 8), foreground="#8a8a8a", wraplength=540).pack(anchor="w", pady=(0, 2))
 
     def _legend():
         if not st["primary"]:
