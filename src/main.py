@@ -20,6 +20,7 @@ TOOLS = [
     ("🔒", "Protect", "Kunci password", "warning"),
     ("🔓", "Unlock", "Buka kunci", "success"),
     ("👁", "OCR", "Scan jadi teks", "info"),
+    ("☰", "Atur", "Susun ulang halaman", "dark"),
 ]
 
 
@@ -131,7 +132,7 @@ def body_merge(win, frm, say):
         _remember(out)
         _busy_btn(btn)
         say("Menggabung...")
-        run_async(lambda: pdf_ops.merge_pdfs(list(files), out),
+        run_async(frm, lambda: pdf_ops.merge_pdfs(list(files), out),
                   lambda r: _succeeded("Merge", r, say, btn),
                   lambda e: (say(f"Gagal: {e}"), _busy_btn(btn, False)))
     btn.configure(command=go)
@@ -178,7 +179,7 @@ def body_split(win, frm, say):
         d = filedialog.askdirectory() or (os.path.dirname(src["p"]))
         _busy_btn(btn)
         say("Memecah...")
-        run_async(lambda: pdf_ops.split_pdf(src["p"], d, spec.get().strip()),
+        run_async(frm, lambda: pdf_ops.split_pdf(src["p"], d, spec.get().strip()),
                   lambda r: (_succeeded("Split", r[0] if r else d, say, btn),
                              say(f"Total {len(r)} file di: {d}")),
                   lambda e: (say(f"Gagal: {e}"), _busy_btn(btn, False)))
@@ -228,7 +229,7 @@ def _single_file_body(frm, say, btn_text, btn_style, fn, need_spec=False,
                 args[k] = v.get()
         _busy_btn(btn)
         say("Memproses...")
-        run_async(lambda: fn(src["p"], out, **args,
+        run_async(frm, lambda: fn(src["p"], out, **args,
                              **({"spec": spec_var.get()} if need_spec else {})),
                   lambda r: _succeeded(tool, r if isinstance(r, str) else r.get("output", out), say, btn),
                   lambda e: (say(f"Gagal: {e}"), _busy_btn(btn, False)))
@@ -281,7 +282,7 @@ def body_pdf2img(win, frm, say):
         d = filedialog.askdirectory() or os.path.dirname(src["p"])
         _busy_btn(btn)
         say("Convert...")
-        run_async(lambda: pdf_ops.pdf_to_images(src["p"], d, int(dpi.get()), fmt.get()),
+        run_async(frm, lambda: pdf_ops.pdf_to_images(src["p"], d, int(dpi.get()), fmt.get()),
                   lambda r: (_succeeded("PDF→Img", r[0] if r else d, say, btn),
                              say(f"Total {len(r)} gambar di: {d}")),
                   lambda e: (say(f"Gagal: {e}"), _busy_btn(btn, False)))
@@ -303,7 +304,7 @@ def body_img2pdf(win, frm, say):
         _remember(out)
         _busy_btn(btn)
         say("Membuat PDF...")
-        run_async(lambda: pdf_ops.images_to_pdf(list(files), out),
+        run_async(frm, lambda: pdf_ops.images_to_pdf(list(files), out),
                   lambda r: _succeeded("Img→PDF", r, say, btn),
                   lambda e: (say(f"Gagal: {e}"), _busy_btn(btn, False)))
     btn.configure(command=go)
@@ -389,8 +390,239 @@ def body_metadata(win, frm, say):
             return
         _busy_btn(btn)
         meta = {"title": title.get(), "author": author.get(), "subject": subject.get()}
-        run_async(lambda: pdf_ops.set_metadata(src["p"], out, meta),
+        run_async(frm, lambda: pdf_ops.set_metadata(src["p"], out, meta),
                   lambda r: _succeeded("Metadata", r, say, btn),
+                  lambda e: (say(f"Gagal: {e}"), _busy_btn(btn, False)))
+    btn.configure(command=go)
+
+
+def body_organize(win, frm, say):
+    """Atur Halaman ala iLovePDF Organize: thumbnail grid + drag-drop
+    susun ulang, putar, hapus, tambah dari PDF lain. Tanpa render ulang
+    saat simpan (vektor tetap tajam)."""
+    import tkinter as tk
+    import ttkbootstrap as ttk
+    from tkinter import filedialog
+    from src.ui.widgets import run_async
+
+    COLS, MAXW, CAP = 4, 140, 300
+    st = {"primary": "", "extras": [], "items": [], "snap": [],
+          "sel": set(), "anchor": 0, "thumbs": {}, "drag": None}
+    refs = []
+
+    top = ttk.Frame(frm)
+    top.pack(fill="x")
+    name_lbl = ttk.Label(top, text="Belum ada PDF", font=("Segoe UI", 9, "bold"))
+    name_lbl.pack(side="left", fill="x", expand=True)
+    cnt_lbl = ttk.Label(top, text="")
+    cnt_lbl.pack(side="right")
+
+    cv_box = ttk.Frame(frm)
+    cv_box.pack(fill="both", expand=True, pady=4)
+    cv = tk.Canvas(cv_box, highlightthickness=0)
+    sb = ttk.Scrollbar(cv_box, orient="vertical", command=cv.yview)
+    cv.configure(yscrollcommand=sb.set)
+    sb.pack(side="right", fill="y")
+    cv.pack(side="left", fill="both", expand=True)
+    inner = ttk.Frame(cv)
+    cv.create_window((0, 0), window=inner, anchor="nw")
+    inner.bind("<Configure>", lambda _e: cv.configure(scrollregion=cv.bbox("all")))
+
+    def _load_thumbs():
+        from PIL import Image
+        import io as _io
+        import pymupdf as _fitz
+        st["thumbs"] = thumbs = {}
+        files = [st["primary"], *st["extras"]] if st["primary"] else []
+        if not files:
+            return
+        need = {(s, o) for (s, o, _r) in st["items"][:CAP]}
+        docs = [_fitz.open(p) for p in files]
+        try:
+            for (s, o) in need:
+                if (s, o) in thumbs or not 0 <= s < len(docs):
+                    continue
+                pg = docs[s][o]
+                z = min(max(MAXW / max(1.0, pg.rect.width), 0.1), 3.0)
+                pix = pg.get_pixmap(matrix=_fitz.Matrix(z, z))
+                thumbs[(s, o)] = Image.open(_io.BytesIO(pix.tobytes("png"))).convert("RGB")
+        finally:
+            for d in docs:
+                d.close()
+
+    def refresh():
+        for w in inner.winfo_children():
+            w.destroy()
+        refs.clear()
+        n = len(st["items"])
+        cnt_lbl.configure(text=f"{n} halaman" + (f" • {len(st['sel'])} dipilih" if st["sel"] else ""))
+        shown = st["items"][:CAP]
+        if n > CAP:
+            say(f"Preview dibatasi {CAP} halaman pertama (simpan tetap full).")
+        for pos, (s, o, r) in enumerate(shown):
+            cell = tk.Frame(inner, relief="sunken" if pos in st["sel"] else "groove",
+                            borderwidth=2,
+                            bg="#1f6feb" if pos in st["sel"] else None)
+            cell.grid(row=pos // COLS, column=pos % COLS, padx=4, pady=4)
+            im = st["thumbs"].get((s, o))
+            if im is not None:
+                disp = im.rotate(-r, expand=True) if r else im
+                from src.ui.thumbs import to_tk
+                try:
+                    ph = to_tk(disp)
+                    refs.append(ph)
+                    pic = tk.Label(cell, image=ph, bg=cell.cget("bg"))
+                except Exception:
+                    pic = tk.Label(cell, text=f"hal {o + 1}", width=18, height=8)
+            else:
+                pic = tk.Label(cell, text=f"hal {o + 1}", width=18, height=8)
+            pic.pack()
+            tag = f"{o + 1}{f' • {r}°' if r else ''}{f' (+{s})' if s else ''}"
+            tk.Label(cell, text=tag, font=("Segoe UI", 8),
+                     bg=cell.cget("bg")).pack()
+            for wdg in (cell, pic):
+                wdg.bind("<ButtonPress-1>", lambda e, p=pos: _press(p, e))
+                wdg.bind("<B1-Motion>", _motion)
+                wdg.bind("<ButtonRelease-1>", lambda e, p=pos: _release(p, e))
+        # bind label anak juga
+        for cell in inner.winfo_children():
+            for ch in cell.winfo_children():
+                ch.bind("<ButtonPress-1>", lambda e, p=cell.grid_info()["row"] * COLS + cell.grid_info()["column"]: _press(p, e))
+                ch.bind("<B1-Motion>", _motion)
+                ch.bind("<ButtonRelease-1>", lambda e, p=cell.grid_info()["row"] * COLS + cell.grid_info()["column"]: _release(p, e))
+
+    def _press(pos, ev):
+        # Catat saja; JANGAN refresh di sini (widget sedang di-drag akan hancur).
+        st["drag"] = {"from": pos, "x": ev.x_root, "y": ev.y_root, "move": False}
+        if ev.state & 0x4:  # Ctrl
+            st["sel"] ^= {pos}
+            st["anchor"] = pos
+        elif ev.state & 0x1 and st["anchor"] is not None:  # Shift
+            a, b = sorted((st["anchor"], pos))
+            st["sel"] = set(range(a, b + 1))
+        else:
+            st["_pending_sel"] = pos
+            st["anchor"] = pos
+
+    def _motion(ev):
+        d = st.get("drag")
+        if not d:
+            return
+        if abs(ev.x_root - d["x"]) + abs(ev.y_root - d["y"]) > 8:
+            d["move"] = True
+
+    def _release(pos, _ev):
+        d = st.get("drag")
+        st["drag"] = None
+        if not d:
+            return
+        if not d["move"]:
+            # klik murni: terapkan seleksi sekarang lalu refresh
+            pending = st.pop("_pending_sel", None)
+            if pending is not None and pending not in st["sel"]:
+                st["sel"] = {pending}
+            refresh()
+            return
+        src, dst = d["from"], pos
+        if src == dst:
+            refresh()
+            return
+        st.pop("_pending_sel", None)
+        it = st["items"].pop(src)
+        st["items"].insert(dst, it)
+        st["sel"] = {dst}
+        st["anchor"] = dst
+        say(f"Pindah hal ke posisi {dst + 1}.")
+        refresh()
+
+    def _need_file():
+        if not st["primary"]:
+            say("Pilih PDF dulu.")
+            return False
+        return True
+
+    def pick():
+        p = filedialog.askopenfilename(filetypes=[("PDF", "*.pdf")])
+        if not p:
+            return
+        _remember(p)
+        st.update(primary=p, extras=[], sel=set(), anchor=0)
+        try:
+            n = pdf_ops.pdf_info(p)["pages"]
+        except Exception as e:  # noqa: BLE001
+            return say(f"Gagal baca: {e}")
+        st["items"] = [(0, i, 0) for i in range(n)]
+        st["snap"] = list(st["items"])
+        name_lbl.configure(text=f"{os.path.basename(p)} ({n} hal)")
+        say("Memuat thumbnail...")
+        run_async(frm, _load_thumbs,
+                  lambda _r: (refresh(), say("Siap. Seret thumbnail untuk susun ulang.")),
+                  lambda e: say(f"Gagal: {e}"))
+
+    def add_more():
+        if not _need_file():
+            return
+        ps = filedialog.askopenfilenames(filetypes=[("PDF", "*.pdf")])
+        for p in ps:
+            try:
+                n = pdf_ops.pdf_info(p)["pages"]
+            except Exception as e:  # noqa: BLE001
+                say(f"Lewati {os.path.basename(p)}: {e}")
+                continue
+            st["extras"].append(p)
+            s = len(st["extras"])
+            st["items"] += [(s, i, 0) for i in range(n)]
+            say(f"+{n} hal dari {os.path.basename(p)}.")
+        st["snap"] = list(st["items"])
+        run_async(frm, _load_thumbs, lambda _r: refresh(), lambda e: say(f"Gagal: {e}"))
+
+    def rotate_sel(dgr):
+        if not _need_file() or not st["sel"]:
+            return say("Klik dulu halaman yang mau diputar.")
+        for pos in st["sel"]:
+            s, o, r = st["items"][pos]
+            st["items"][pos] = (s, o, (r + dgr) % 360)
+        refresh()
+
+    def delete_sel():
+        if not _need_file() or not st["sel"]:
+            return say("Klik dulu halaman yang mau dihapus.")
+        for pos in sorted(st["sel"], reverse=True):
+            del st["items"][pos]
+        st["sel"] = set()
+        say(f"Dihapus. Sisa {len(st['items'])} halaman.")
+        refresh()
+
+    def reset():
+        if not _need_file():
+            return
+        st["items"] = list(st["snap"])
+        st["sel"] = set()
+        refresh()
+        say("Urutan dikembalikan.")
+
+    bar = ttk.Frame(frm)
+    bar.pack(fill="x", pady=(0, 2))
+    ttk.Button(bar, text="Pilih PDF", command=pick).pack(side="left")
+    ttk.Button(bar, text="＋ Tambah PDF", command=add_more).pack(side="left", padx=4)
+    ttk.Button(bar, text="⟲", width=4, command=lambda: rotate_sel(270)).pack(side="left")
+    ttk.Button(bar, text="⟳", width=4, command=lambda: rotate_sel(90)).pack(side="left", padx=2)
+    ttk.Button(bar, text="✕ Hapus", command=delete_sel).pack(side="left", padx=4)
+    ttk.Button(bar, text="↺ Reset", command=reset).pack(side="right")
+    btn = ttk.Button(frm, text="Simpan hasil → PDF", bootstyle="primary")
+    btn.pack(fill="x", pady=6)
+
+    def go():
+        if not _need_file() or not st["items"]:
+            return say("Tidak ada halaman untuk disimpan.")
+        out = _ask_out("organized.pdf")
+        if not out:
+            return
+        _busy_btn(btn)
+        say("Menyimpan...")
+        items, extras, prim = list(st["items"]), list(st["extras"]), st["primary"]
+        run_async(frm, lambda: pdf_ops.organize_pdfs(prim, out, items, extras),
+                  lambda r: _succeeded("Atur", r, say, btn),
                   lambda e: (say(f"Gagal: {e}"), _busy_btn(btn, False)))
     btn.configure(command=go)
 
@@ -444,7 +676,7 @@ def body_ocr(win, frm, say):
             return ocr_ops.ocr_pdf_to_searchable(
                 src["p"], out, lang=L, dpi=D,
                 progress=lambda i, t: say(f"Hal {i}/{t}..."))
-        run_async(_task,
+        run_async(frm, _task,
                   lambda r: _succeeded("OCR", r, say, btn),
                   lambda e: (say(f"Gagal: {e}"), _busy_btn(btn, False)))
     btn.configure(command=go)
@@ -465,7 +697,7 @@ BUILDERS = {
     "Nomor": lambda w, f, s: _single_file_body(
         f, s, "Tambah nomor", "light", pdf_ops.add_page_numbers, tool="Nomor"),
     "Metadata": body_metadata, "Protect": body_protect, "Unlock": body_unlock,
-    "OCR": body_ocr,
+    "OCR": body_ocr, "Atur": body_organize,
 }
 
 

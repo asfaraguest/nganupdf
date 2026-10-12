@@ -300,6 +300,48 @@ def page_thumbnail(path: str, page_no: int, max_w: int = 180) -> bytes:
         return pix.tobytes("png")
 
 
+# ---------------------------------------------------------------- P2: organize
+def organize_pdfs(primary: str, output: str, items: list[tuple[int, int, int]],
+                  extras: list[str] | None = None) -> str:
+    """Susun ulang halaman ala iLovePDF Organize, tanpa render ulang.
+
+    items = [(src, orig_idx_0based, extra_rot90), ...] urutan baru.
+    src 0 = primary, 1..n = extras. extra_rot kelipatan 90 (ditambah ke
+    rotasi asli). Entri yang tidak ada di items = dihapus.
+    """
+    _require_exists(primary)
+    extras = list(extras or [])
+    for p in extras:
+        _require_exists(p)
+    if not items:
+        raise ValueError("Tidak ada halaman tersisa (semua dihapus?).")
+    _ensure_parent(output)
+    docs = [pymupdf.open(primary)] + [pymupdf.open(p) for p in extras]
+    try:
+        for d in docs:
+            if d.is_encrypted:
+                raise ValueError("Ada PDF terkunci — unlock dulu.")
+        nd = pymupdf.open()
+        for (src, orig, rot) in items:
+            if not 0 <= src < len(docs):
+                raise ValueError(f"Sumber halaman salah: {src}")
+            doc = docs[src]
+            if not 0 <= orig < doc.page_count:
+                raise ValueError(f"Halaman {orig + 1} di luar jangkauan.")
+            if rot % 90 != 0:
+                raise ValueError("Rotasi harus kelipatan 90.")
+            nd.insert_pdf(doc, from_page=orig, to_page=orig)
+            if rot:
+                pg = nd[-1]
+                pg.set_rotation((doc[orig].rotation + rot) % 360)
+        nd.save(output, garbage=4, deflate=True)
+        nd.close()
+    finally:
+        for d in docs:
+            d.close()
+    return output
+
+
 # ---------------------------------------------------------------- P1: watermark / pagenum / metadata / security
 def add_watermark(path: str, output: str, text: str, fontsize: int = 48,
                   rotate: int = 0, opacity: float = 0.15) -> str:

@@ -80,6 +80,13 @@ def main():
     pdf_ops.unlock_pdf(pr, ul, "1234")
     print("protect/unlock OK")
 
+    og = os.path.join(TMP, "org.pdf")
+    # balik urutan 5 hal gab.pdf + putar hal pertama 90 + tambah 1 hal dari a.pdf
+    items = [(0, 4, 90), (0, 3, 0), (0, 2, 0), (1, 0, 0)]
+    pdf_ops.organize_pdfs(m, og, items, extras=[a])
+    assert pdf_ops.pdf_info(og)["pages"] == 4
+    print("organize OK")
+
     print("\nSEMUA TEST LOLOS")
 
 

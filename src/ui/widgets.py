@@ -1,17 +1,49 @@
 """Widget reusable: DropZone (drag-drop), FileList, run_async worker."""
 import os
+import queue
 import threading
 
+# Semua callback UI HARUS jalan di main thread Tk. run_async menaruh
+# hasilnya ke antrean ini; _pump (after-loop di main thread) mengeksekusinya.
+_UIQ: queue.Queue = queue.Queue()
 
-def run_async(fn, on_done, on_error):
-    """Jalankan fn() di thread agar UI tidak freeze."""
+
+def _pump(widget):
+    try:
+        while True:
+            cb = _UIQ.get_nowait()
+            try:
+                cb()
+            except Exception:
+                pass
+    except queue.Empty:
+        pass
+    try:
+        widget.after(100, lambda: _pump(widget))
+    except Exception:
+        pass
+
+
+def run_async(widget, fn, on_done, on_error):
+    """Jalankan fn() di thread agar UI tidak freeze.
+
+    on_done/on_error selalu dieksekusi di MAIN thread (aman sentuh widget).
+    widget = frame/window pemilik (untuk after-pump).
+    """
+    try:
+        if not getattr(widget, "_pump_on", False):
+            widget._pump_on = True  # type: ignore[attr-defined]
+            widget.after(100, lambda: _pump(widget))
+    except Exception:
+        pass
+
     def _t():
         try:
             res = fn()
         except Exception as e:  # noqa: BLE001
-            on_error(e)
+            _UIQ.put(lambda: on_error(e))
         else:
-            on_done(res)
+            _UIQ.put(lambda: on_done(res))
     threading.Thread(target=_t, daemon=True).start()
 
 

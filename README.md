@@ -3,9 +3,10 @@
 Multitool PDF offline ala PDF24. Python + tkinter + PyMuPDF.
 Tanpa install, tanpa internet.
 
-## Fitur (13 tool)
+## Fitur (14 tool)
 
-Merge, Split (+preview), Rotate, Hapus/Extract, Compress, Gambar→PDF,
+Merge, Split (+preview), Atur Halaman (susun ulang drag-drop, putar,
+hapus, tambah PDF), Rotate, Hapus/Extract, Compress, Gambar→PDF,
 PDF→Gambar, Watermark, Nomor halaman, Metadata, Protect, Unlock,
 OCR (plugin opsional).
 
