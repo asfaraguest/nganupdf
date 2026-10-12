@@ -1,61 +1,41 @@
-# NganuPDF — multitool PDF offline ala PDF24
+# NganuPDF
 
-> Sejak v1.0.2 proyek ini bernama **NganuPDF** (sebelumnya PDFTool —
-> rilis v1.0.0/v1.0.1 masih memakai nama lama).
+Multitool PDF offline ala PDF24. Python + tkinter + PyMuPDF.
+Tanpa install, tanpa internet.
 
-Techstack minimal: **Python + PyMuPDF + Pillow + tkinter + ttkbootstrap + tkinterdnd2**.
-Tanpa Node, tanpa Rust, tanpa server. 100% offline.
+## Fitur (13 tool)
 
-## Jalankan (Windows)
+Merge, Split (+preview), Rotate, Hapus/Extract, Compress, Gambar→PDF,
+PDF→Gambar, Watermark, Nomor halaman, Metadata, Protect, Unlock,
+OCR (plugin opsional).
 
-1. Install Python 3.12 + centang `tcl/tk`.
-2. `pip install -r requirements.txt`
-3. `py src/main.py` — atau dobel-klik `NganuPDF.exe` hasil build.
+## Pakai (Windows)
 
-## Build .exe portable (di PC Windows)
+1. Unduh zip dari [Releases](https://github.com/asfaraguest/pdftool-portable/releases), extract.
+2. Dobel-klik `NganuPDF.exe`.
 
-Klik 2x `build-windows.bat`, hasil: `dist\NganuPDF\NganuPDF.exe` + ikon.
-Folder `dist\NganuPDF` + `data\` + `plugins\` = paket portable siap-zip.
-Tips kecilkan hasil: di Windows UPX aktif default bila `upx.exe` ada di PATH.
+Setting tersimpan di folder `data\` sebelah exe. Untuk OCR,
+lihat `plugins/ocr-README.md`.
 
-## Cross-build .exe dari Linux (terbukti jalan, 2026-10-12)
+## Jalan dari source
 
-PyInstaller tidak cross-compile, jadi dipakai **Wine 11 + Python Windows**:
-`dist-win/PDFTool-v1.0-win64-portable.zip` (39MB) di-build di server ini via
-Kron4ek Wine portable + `python-3.12.10-amd64.exe /quiet` + PyInstaller
-`--onedir --noconsole`. Smoke-test + screenshot dashboard OK di bawah
-`xvfb`+Wine. Ulangi: pasang Wine 64-bit → install Python Windows + pip deps
-→ copy proyek ke `C:\nganupdf` → jalankan perintah yang sama seperti
-`build-windows.bat` via `wine cmd /c`.
+Butuh Python 3.12 (centang `tcl/tk` saat install).
 
-## Build Linux (terbukti jalan di sini)
+```sh
+pip install -r requirements.txt
+py src/main.py        # Windows
+bash run.sh           # Linux
+```
 
-`source dev-env.sh` (tkinter tanpa sudo, khusus server ini) lalu
-`bash build-portable.sh`. Hasil terverifikasi 2026-10-10:
-`dist/PDFTool` 102MB → zip 72MB, smoke-test GUI + screenshot dashboard OK
-di bawah `xvfb`. Catatan: PyInstaller menonaktifkan UPX di Linux
-(inkompatibilitas .so); di Windows UPX tetap bisa dipakai.
+## Build
 
-Di Linux server ini `tkinter` sistem tidak ada (tanpa sudo), jadi GUI hanya jalan
-di Windows/PC desktop. Core sudah dites headless: `python3 tests/test_core.py`.
+```sh
+build-windows.bat     # di Windows -> dist\NganuPDF
+bash build-portable.sh  # di Linux  -> dist/NganuPDF
+```
 
-## Fitur P0+P1+P2 (13 tool, dashboard grid)
+## Ukuran & privasi
 
-Merge (+preview thumbnail), Split (+preview strip), Rotate, Hapus/Extract,
-Compress, Img→PDF, PDF→Img, Watermark, Nomor halaman, Metadata,
-Protect, Unlock, **OCR → PDF searchable (plugin opsional)**.
-
-## Portable
-
-- `build-portable.sh` → `dist/NganuPDF/` → zip → colok USB.
-- Settings di `data/settings.json` sebelah exe (bukan %APPDATA%).
-- OCR: isi `plugins/tesseract/` + `tessdata ind+eng` sesuai `plugins/ocr-README.md`
-  (±14MB). Tanpa itu 12 tool lain tetap jalan; badge dashboard `OCR ✗/✓`.
-- Office-convert sengaja tidak dibundel
-  agar zip tetap <30MB. Tambahkan manual bila perlu.
-
-## Ukuran (aktual, bukan estimasi)
-
-Linux `--onedir --strip`: folder 102MB (terbesar: PyMuPDF 53MB + Pillow 14MB
-+ Python 9MB), zip 72MB. Windows kurang-lebih sama, bisa susut dengan UPX.
-`--onefile` tidak dipakai (start lambat).
+Folder hasil build ±80–100MB (paling besar PyMuPDF), zip ±39MB.
+100% offline: tidak ada kode jaringan di `src/`, tanpa telemetri,
+tanpa update otomatis, tanpa upload file ke mana pun.
