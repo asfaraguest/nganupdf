@@ -87,6 +87,39 @@ def main():
     assert pdf_ops.pdf_info(og)["pages"] == 4
     print("organize OK")
 
+    r = pdf_ops.repair_pdf(m, os.path.join(TMP, "rep.pdf"))
+    assert r["pages"] == 5
+    print(f"repair OK {r['before']} -> {r['after']}")
+
+    cr = os.path.join(TMP, "crop.pdf")
+    pdf_ops.crop_pdf(a, cr, "*", m_left=10, m_top=10, m_right=10, m_bottom=10)
+    print("crop OK")
+
+    rd = os.path.join(TMP, "red.pdf")
+    rr = pdf_ops.redact_text(a, rd, "DokA")
+    assert rr["hits"] >= 2
+    print(f"redact OK {rr['hits']} hit")
+
+    tx = os.path.join(TMP, "txt.pdf")
+    pdf_ops.add_text(a, tx, "CAP", "*", pos="tengah", fontsize=20, color="merah")
+    print("add_text OK")
+
+    sg = os.path.join(TMP, "sig.pdf")
+    pdf_ops.sign_pdf(a, sg, img, "*", pos="kanan-bawah", scale=20)
+    print("sign OK")
+
+    with open(os.path.join(TMP, "t.html"), "w", encoding="utf-8") as f:
+        f.write("<h1>Halo</h1><p>Tes html.</p>")
+    hp = os.path.join(TMP, "dari-html.pdf")
+    pdf_ops.html_to_pdf(os.path.join(TMP, "t.html"), hp)
+    assert "Halo" in pymupdf.open(hp)[0].get_text()
+    print("html2pdf OK")
+
+    md = os.path.join(TMP, "hasil.md")
+    pdf_ops.pdf_to_markdown(a, md)
+    assert "# Halaman 1" in open(md, encoding="utf-8").read()
+    print("pdf2md OK")
+
     print("\nSEMUA TEST LOLOS")
 
 

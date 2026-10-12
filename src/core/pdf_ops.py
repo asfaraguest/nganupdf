@@ -342,6 +342,184 @@ def organize_pdfs(primary: str, output: str, items: list[tuple[int, int, int]],
     return output
 
 
+# ---------------------------------------------------------------- P3: repair
+def repair_pdf(path: str, output: str) -> dict:
+    """Buka + simpan ulang (garbage+clean+deflate). MuPDF otomatis
+    memperbaiki struktur rusak saat open; gagal total -> error jelas."""
+    _require_exists(path)
+    _ensure_parent(output)
+    before = os.path.getsize(path)
+    try:
+        doc = pymupdf.open(path)
+    except Exception as e:
+        raise ValueError(f"PDF tidak bisa dibuka (rusak berat?): {e}")
+    try:
+        if doc.is_encrypted:
+            raise ValueError("PDF terkunci — unlock dulu.")
+        doc.save(output, garbage=4, clean=True, deflate=True)
+        pages = doc.page_count
+    finally:
+        doc.close()
+    after = os.path.getsize(output)
+    return {"output": output, "before": before, "after": after, "pages": pages}
+
+
+# ---------------------------------------------------------------- P3: crop / redact / sign / text
+def crop_pdf(path: str, output: str, spec: str = "",
+             m_left: int = 5, m_top: int = 5, m_right: int = 5, m_bottom: int = 5) -> str:
+    """Potong tepi halaman (cropbox). Margin dalam persen 0-40 per sisi."""
+    for v in (m_left, m_top, m_right, m_bottom):
+        if not 0 <= int(v) <= 40:
+            raise ValueError("Margin harus 0-40%.")
+    _require_exists(path)
+    _ensure_parent(output)
+    with pymupdf.open(path) as doc:
+        if doc.is_encrypted:
+            raise ValueError("PDF terkunci — unlock dulu.")
+        pages = parse_page_spec(spec, doc.page_count)
+        for pno in pages:
+            page = doc[pno]
+            r = page.rect
+            page.set_cropbox(pymupdf.Rect(
+                r.x0 + r.width * int(m_left) / 100,
+                r.y0 + r.height * int(m_top) / 100,
+                r.x1 - r.width * int(m_right) / 100,
+                r.y1 - r.height * int(m_bottom) / 100))
+        doc.save(output, garbage=4, deflate=True)
+    return output
+
+
+def redact_text(path: str, output: str, queries: str = "") -> dict:
+    """Hitamkan permanen semua kemunculan kata (koma-pisah, case-insensitive)."""
+    words = [w.strip() for w in (queries or "").replace("\n", ",").split(",") if w.strip()]
+    if not words:
+        raise ValueError("Isi dulu kata yang mau dihitamkan.")
+    _require_exists(path)
+    _ensure_parent(output)
+    count = 0
+    with pymupdf.open(path) as doc:
+        if doc.is_encrypted:
+            raise ValueError("PDF terkunci — unlock dulu.")
+        for page in doc:
+            for w in words:
+                for inst in page.search_for(w):
+                    page.add_redact_annot(inst, fill=(0, 0, 0))
+                    count += 1
+            page.apply_redactions()
+        doc.save(output, garbage=4, deflate=True)
+    if not count:
+        raise ValueError("Kata tidak ditemukan di PDF.")
+    return {"output": output, "hits": count}
+
+
+POS9 = {  # fraksi (x, y) dari rect halaman
+    "kiri-atas": (0.08, 0.10), "tengah-atas": (0.50, 0.10), "kanan-atas": (0.92, 0.10),
+    "kiri-tengah": (0.08, 0.50), "tengah": (0.50, 0.50), "kanan-tengah": (0.92, 0.50),
+    "kiri-bawah": (0.08, 0.90), "tengah-bawah": (0.50, 0.90), "kanan-bawah": (0.92, 0.90),
+}
+
+COLORS = {"hitam": (0, 0, 0), "merah": (0.8, 0, 0), "biru": (0, 0, 0.8),
+          "hijau": (0, 0.5, 0), "abu": (0.4, 0.4, 0.4)}
+
+
+def _pos_point(rect, pos: str):
+    fx, fy = POS9.get(pos, POS9["kanan-bawah"])
+    return rect.x0 + rect.width * fx, rect.y0 + rect.height * fy
+
+
+def add_text(path: str, output: str, text: str = "", spec: str = "",
+             pos: str = "kanan-bawah", fontsize: int = 12,
+             color: str = "hitam") -> str:
+    if not (text or "").strip():
+        raise ValueError("Teks kosong.")
+    if not 6 <= int(fontsize) <= 72:
+        raise ValueError("Ukuran font 6-72.")
+    _require_exists(path)
+    _ensure_parent(output)
+    col = COLORS.get(color, COLORS["hitam"])
+    with pymupdf.open(path) as doc:
+        if doc.is_encrypted:
+            raise ValueError("PDF terkunci — unlock dulu.")
+        for pno in parse_page_spec(spec, doc.page_count):
+            page = doc[pno]
+            x, y = _pos_point(page.rect, pos)
+            page.insert_text((x - len(text) * int(fontsize) * 0.28, y),
+                             text, fontsize=int(fontsize), color=col, overlay=True)
+        doc.save(output, garbage=4, deflate=True)
+    return output
+
+
+def sign_pdf(path: str, output: str, img_path: str, spec: str = "",
+             pos: str = "kanan-bawah", scale: int = 25) -> str:
+    """Tempel gambar tanda tangan. scale = % lebar halaman."""
+    _require_exists(path)
+    _require_exists(img_path)
+    if not img_path.lower().endswith(SUPPORTED_IMG_EXTS):
+        raise ValueError("File tanda tangan harus gambar (png/jpg).")
+    if not 5 <= int(scale) <= 80:
+        raise ValueError("Skala 5-80%.")
+    _ensure_parent(output)
+    im = Image.open(img_path).convert("RGBA")
+    buf = __import__("io").BytesIO()
+    im.save(buf, "PNG")
+    blob = buf.getvalue()
+    iw, ih = im.size
+    with pymupdf.open(path) as doc:
+        if doc.is_encrypted:
+            raise ValueError("PDF terkunci — unlock dulu.")
+        for pno in parse_page_spec(spec, doc.page_count):
+            page = doc[pno]
+            r = page.rect
+            w = r.width * int(scale) / 100
+            h = w * ih / iw
+            cx, cy = _pos_point(r, pos)
+            page.insert_image(pymupdf.Rect(cx - w / 2, cy - h / 2, cx + w / 2, cy + h / 2),
+                              stream=blob, overlay=True)
+        doc.save(output, garbage=4, deflate=True)
+    return output
+
+
+# ---------------------------------------------------------------- P3: html -> pdf, pdf -> markdown
+def html_to_pdf(html_path: str, output: str) -> str:
+    if not (html_path or "").lower().endswith((".html", ".htm")):
+        raise ValueError("Pilih file .html/.htm.")
+    _require_exists(html_path)
+    _ensure_parent(output)
+    with open(html_path, encoding="utf-8", errors="replace") as f:
+        html = f.read()
+    if not html.strip():
+        raise ValueError("File HTML kosong.")
+
+    def rectfn(_pno, _filled):
+        mb = pymupdf.Rect(0, 0, 595, 842)  # A4 portrait 72dpi
+        return mb, mb + (36, 36, -36, -36), pymupdf.Matrix(1, 1)
+
+    story = pymupdf.Story(html=html, em=12)
+    w = pymupdf.DocumentWriter(output)
+    try:
+        story.write(w, rectfn)
+    finally:
+        w.close()
+    return output
+
+
+def pdf_to_markdown(path: str, output: str) -> str:
+    _require_exists(path)
+    _ensure_parent(output)
+    with pymupdf.open(path) as doc:
+        if doc.is_encrypted:
+            raise ValueError("PDF terkunci — unlock dulu.")
+        if doc.page_count == 0:
+            raise ValueError("PDF kosong.")
+        parts = []
+        for i, page in enumerate(doc):
+            txt = page.get_text().strip()
+            parts.append(f"# Halaman {i + 1}\n\n{txt if txt else '*(kosong / hasil scan)*'}\n")
+    with open(output, "w", encoding="utf-8") as f:
+        f.write("\n".join(parts))
+    return output
+
+
 # ---------------------------------------------------------------- P1: watermark / pagenum / metadata / security
 def add_watermark(path: str, output: str, text: str, fontsize: int = 48,
                   rotate: int = 0, opacity: float = 0.15) -> str:

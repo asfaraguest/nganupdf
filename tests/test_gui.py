@@ -1,4 +1,4 @@
-"""Test GUI headless (butuh xvfb): buka dashboard + ke-14 tool window,
+"""Test GUI headless (butuh xvfb): buka dashboard + ke-22 tool window,
 plus alur fungsional Atur Halaman (pilih PDF, klik seleksi, drag pindah).
 
 Jalankan: source dev-env.sh && xvfb-run -a python3 tests/test_gui.py
@@ -21,7 +21,7 @@ def main():
     import ttkbootstrap as ttk
     app = ttk.Window(themename="darkly")
     app.withdraw()
-    assert len(M.TOOLS) == 14, f"kartu dashboard {len(M.TOOLS)} != 14"
+    assert len(M.TOOLS) == 22, f"kartu dashboard {len(M.TOOLS)} != 22"
     assert set(M.BUILDERS) == {t[1] for t in M.TOOLS}, "BUILDERS vs TOOLS tidak sinkron"
 
     msgs = []
@@ -30,7 +30,7 @@ def main():
         msgs.append(m)
 
     import tkinter as tk
-    for _icon, name, _desc, _style in M.TOOLS:
+    for _icon, name, _desc, _style, _cat in M.TOOLS:
         frm = ttk.Frame(app)
         frm.pack()
         try:

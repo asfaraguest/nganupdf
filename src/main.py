@@ -7,30 +7,41 @@ sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)), ".."
 from src.core import ocr_ops, pdf_ops, recent, settings  # noqa: E402
 
 TOOLS = [
-    ("⧉", "Merge", "Gabung PDF", "primary"),
-    ("✂", "Split", "Pecah + preview", "success"),
-    ("⟳", "Rotate", "Putar halaman", "info"),
-    ("🗑", "Hapus/Extract", "Hapus atau ambil halaman", "warning"),
-    ("🗜", "Compress", "Kecilkan ukuran", "danger"),
-    ("🖼", "Img→PDF", "Gambar jadi PDF", "primary"),
-    ("📄", "PDF→Img", "PDF jadi gambar", "secondary"),
-    ("©", "Watermark", "Tanda air teks", "dark"),
-    ("#", "Nomor", "Nomor halaman", "light"),
-    ("🏷", "Metadata", "Judul/penulis", "info"),
-    ("🔒", "Protect", "Kunci password", "warning"),
-    ("🔓", "Unlock", "Buka kunci", "success"),
-    ("👁", "OCR", "Scan jadi teks", "info"),
-    ("☰", "Atur", "Susun ulang halaman", "dark"),
+    # ikon, nama, deskripsi, warna, kategori
+    ("⧉", "Merge", "Gabung PDF", "primary", "Susun"),
+    ("✂", "Split", "Pecah + preview", "success", "Susun"),
+    ("☰", "Atur", "Susun ulang halaman", "dark", "Susun"),
+    ("🗑", "Hapus/Extract", "Hapus atau ambil halaman", "warning", "Susun"),
+    ("⟳", "Rotate", "Putar halaman", "info", "Edit"),
+    ("◫", "Crop", "Potong tepi halaman", "warning", "Edit"),
+    ("©", "Watermark", "Tanda air teks", "dark", "Edit"),
+    ("🔤", "Teks", "Sisipkan teks bebas", "primary", "Edit"),
+    ("#", "Nomor", "Nomor halaman", "light", "Edit"),
+    ("🏷", "Metadata", "Judul/penulis", "info", "Edit"),
+    ("⬛", "Redact", "Hitamkan teks permanen", "dark", "Edit"),
+    ("✍", "Sign", "Bubuhkan tanda tangan", "info", "Edit"),
+    ("🗜", "Compress", "Kecilkan ukuran", "danger", "Konversi"),
+    ("🖼", "Img→PDF", "Gambar jadi PDF", "primary", "Konversi"),
+    ("📄", "PDF→Img", "PDF jadi gambar", "secondary", "Konversi"),
+    ("🌐", "HTML→PDF", "HTML jadi PDF", "secondary", "Konversi"),
+    ("📝", "PDF→MD", "PDF jadi Markdown", "secondary", "Konversi"),
+    ("🏢", "Office→PDF", "Word/Excel/PPT via MS Office", "warning", "Konversi"),
+    ("👁", "OCR", "Scan jadi teks", "info", "Konversi"),
+    ("🔒", "Protect", "Kunci password", "warning", "Keamanan"),
+    ("🔓", "Unlock", "Buka kunci", "success", "Keamanan"),
+    ("🔧", "Perbaiki", "Betulkan PDF rusak", "success", "Perbaiki"),
 ]
 
+CATS = ["Semua", "Susun", "Edit", "Konversi", "Keamanan", "Perbaiki"]
 
-def _ask_out(default_name="hasil.pdf"):
+
+def _ask_out(default_name="hasil.pdf", ext=".pdf", types=(("PDF", "*.pdf"),)):
     from tkinter import filedialog
     s = settings.load()
     return filedialog.asksaveasfilename(
         initialdir=s.get("last_dir") or os.path.expanduser("~"),
-        initialfile=default_name, defaultextension=".pdf",
-        filetypes=[("PDF", "*.pdf")]) or ""
+        initialfile=default_name, defaultextension=ext,
+        filetypes=list(types)) or ""
 
 
 def _remember(path):
@@ -51,14 +62,14 @@ def _is_dark() -> bool:
 
 
 def _tool_icon(name: str) -> str:
-    for icon, tname, _d, _s in TOOLS:
+    for icon, tname, _d, _s, _c in TOOLS:
         if tname == name:
             return icon
     return "⧉"
 
 
 def _tool_desc(name: str) -> str:
-    for _i, tname, desc, _s in TOOLS:
+    for _i, tname, desc, _s, _c in TOOLS:
         if tname == name:
             return desc
     return ""
@@ -242,8 +253,11 @@ def body_split(win, frm, say):
 
 
 def _single_file_body(frm, say, btn_text, btn_style, fn, need_spec=False,
-                      need_extra=None, tool="Tool"):
-    """Generator umum: 1 file PDF + (opsional spec halaman + opsi) -> 1 output."""
+                      need_extra=None, tool="Tool",
+                      pick_types=(("PDF", "*.pdf"), ("Semua", "*.*")),
+                      save_name="hasil.pdf", save_ext=".pdf",
+                      save_types=(("PDF", "*.pdf"),)):
+    """Generator umum: 1 file + (opsional spec halaman + opsi) -> 1 output."""
     import tkinter as tk
     import ttkbootstrap as ttk
     from tkinter import filedialog
@@ -256,7 +270,7 @@ def _single_file_body(frm, say, btn_text, btn_style, fn, need_spec=False,
     lbl.pack(side="left", fill="x", expand=True)
 
     def pick():
-        p = filedialog.askopenfilename(filetypes=[("PDF", "*.pdf"), ("Semua", "*.*")])
+        p = filedialog.askopenfilename(filetypes=list(pick_types))
         if p:
             src["p"] = p
             _remember(p)
@@ -274,7 +288,7 @@ def _single_file_body(frm, say, btn_text, btn_style, fn, need_spec=False,
     def go():
         if not src["p"]:
             return say("Pilih file dulu.")
-        out = _ask_out("hasil.pdf")
+        out = _ask_out(save_name, save_ext, save_types)
         if not out:
             return
         _remember(out)
@@ -302,6 +316,137 @@ def _compress_extra(frm, vals):
     ttk.Label(frm, text="Skala gambar (0.3-1.0):").pack(anchor="w")
     ttk.Scale(frm, from_=0.3, to=1.0, variable=vals["scale"],
               orient="horizontal").pack(fill="x")
+
+
+def _crop_extra(frm, vals):
+    import tkinter as tk
+    import ttkbootstrap as ttk
+    ttk.Label(frm, text="Margin potong per sisi (% dari 0-40):").pack(anchor="w")
+    grid = ttk.Frame(frm)
+    grid.pack(fill="x")
+    for i, (key, cap) in enumerate((("m_left", "Kiri"), ("m_top", "Atas"),
+                                    ("m_right", "Kanan"), ("m_bottom", "Bawah"))):
+        vals[key] = tk.IntVar(value=5)
+        ttk.Label(grid, text=cap).grid(row=0, column=i)
+        ttk.Entry(grid, textvariable=vals[key], width=6).grid(row=1, column=i, padx=2)
+        grid.columnconfigure(i, weight=1)
+
+
+def _redact_extra(frm, vals):
+    import tkinter as tk
+    import ttkbootstrap as ttk
+    vals["queries"] = tk.StringVar()
+    ttk.Label(frm, text="Kata dihitamkan (koma-pisah):").pack(anchor="w")
+    ttk.Entry(frm, textvariable=vals["queries"]).pack(fill="x")
+
+
+def _text_extra(frm, vals):
+    import tkinter as tk
+    import ttkbootstrap as ttk
+    vals["text"] = tk.StringVar(value="Contoh teks")
+    vals["pos"] = tk.StringVar(value="kanan-bawah")
+    vals["fontsize"] = tk.IntVar(value=12)
+    vals["color"] = tk.StringVar(value="hitam")
+    ttk.Label(frm, text="Teks:").pack(anchor="w")
+    ttk.Entry(frm, textvariable=vals["text"]).pack(fill="x")
+    row = ttk.Frame(frm)
+    row.pack(fill="x", pady=4)
+    ttk.Label(row, text="Posisi:").pack(side="left")
+    ttk.Combobox(row, textvariable=vals["pos"], state="readonly", width=14,
+                 values=sorted(pdf_ops.POS9)).pack(side="left", padx=4)
+    ttk.Label(row, text="Ukuran:").pack(side="left")
+    ttk.Entry(row, textvariable=vals["fontsize"], width=5).pack(side="left", padx=4)
+    ttk.Label(row, text="Warna:").pack(side="left")
+    ttk.Combobox(row, textvariable=vals["color"], state="readonly", width=9,
+                 values=sorted(pdf_ops.COLORS)).pack(side="left", padx=4)
+
+
+def body_sign(win, frm, say):
+    import tkinter as tk
+    import ttkbootstrap as ttk
+    from tkinter import filedialog
+    from src.ui.widgets import run_async
+    src = {"p": "", "img": ""}
+    pos = tk.StringVar(value="kanan-bawah")
+    scale = tk.IntVar(value=25)
+    spec = tk.StringVar(value="*")
+    row = ttk.Frame(frm)
+    row.pack(fill="x")
+    lbl = ttk.Label(row, text="Belum ada PDF")
+    lbl.pack(side="left", fill="x", expand=True)
+
+    def pick():
+        p = filedialog.askopenfilename(filetypes=[("PDF", "*.pdf")])
+        if p:
+            src["p"] = p
+            _remember(p)
+            lbl.configure(text=os.path.basename(p))
+    ttk.Button(row, text="Pilih PDF", command=pick).pack(side="right")
+    row2 = ttk.Frame(frm)
+    row2.pack(fill="x", pady=4)
+    img_lbl = ttk.Label(row2, text="Belum ada gambar")
+    img_lbl.pack(side="left", fill="x", expand=True)
+
+    def pick_img():
+        p = filedialog.askopenfilename(
+            filetypes=[("Gambar", "*.png *.jpg *.jpeg"), ("Semua", "*.*")])
+        if p:
+            src["img"] = p
+            img_lbl.configure(text=os.path.basename(p))
+    ttk.Button(row2, text="Gambar TTD", command=pick_img).pack(side="right")
+    ttk.Label(frm, text="Halaman (* = semua):").pack(anchor="w")
+    ttk.Entry(frm, textvariable=spec).pack(fill="x")
+    row3 = ttk.Frame(frm)
+    row3.pack(fill="x", pady=4)
+    ttk.Label(row3, text="Posisi:").pack(side="left")
+    ttk.Combobox(row3, textvariable=pos, state="readonly", width=14,
+                 values=sorted(pdf_ops.POS9)).pack(side="left", padx=4)
+    ttk.Label(row3, text="Skala %:").pack(side="left")
+    ttk.Entry(row3, textvariable=scale, width=5).pack(side="left", padx=4)
+    btn = _act_btn(frm, "Bubuhkan TTD", "info")
+    btn.pack(fill="x", pady=8)
+
+    def go():
+        if not src["p"] or not src["img"]:
+            return say("Pilih PDF + gambar tanda tangan dulu.")
+        out = _ask_out("signed.pdf")
+        if not out:
+            return
+        _busy_btn(btn)
+        say("Menempel TTD...")
+        run_async(frm, lambda: pdf_ops.sign_pdf(src["p"], out, src["img"],
+                                                spec.get(), pos.get(), int(scale.get())),
+                  lambda r: _succeeded("Sign", r, say, btn),
+                  lambda e: (say(f"Gagal: {e}"), _busy_btn(btn, False)))
+    btn.configure(command=go)
+
+
+def body_office(win, frm, say):
+    import ttkbootstrap as ttk
+    from tkinter import filedialog
+    from src.core import office_ops
+    from src.ui.widgets import make_drop_listbox, run_async
+    ok, msg = office_ops.available()
+    ttk.Label(frm, text=("✓ " + msg) if ok else ("✗ " + msg),
+              bootstyle="success" if ok else "danger").pack(anchor="w", pady=4)
+    dz, lb, files = make_drop_listbox(frm)
+    dz.pack(fill="both", expand=True)
+    btn = _act_btn(frm, "Convert → folder", "warning")
+    btn.pack(fill="x", pady=8)
+
+    def go():
+        from tkinter import filedialog as _fd
+        d = _fd.askdirectory() or (os.path.dirname(files[0]) if files else "")
+        if not d:
+            return
+        _busy_btn(btn)
+        say("Convert via MS Office...")
+        run_async(frm, lambda: office_ops.office_to_pdf(
+            list(files), d, progress=lambda i, t: say(f"File {i + 1}/{t}...")),
+            lambda r: (_succeeded("Office", r[0] if r else d, say, btn),
+                       say(f"Total {len(r)} PDF di: {d}")),
+            lambda e: (say(f"Gagal: {e}"), _busy_btn(btn, False)))
+    btn.configure(command=go)
 
 
 def body_pdf2img(win, frm, say):
@@ -826,6 +971,28 @@ BUILDERS = {
         f, s, "Tambah nomor", "light", pdf_ops.add_page_numbers, tool="Nomor"),
     "Metadata": body_metadata, "Protect": body_protect, "Unlock": body_unlock,
     "OCR": body_ocr, "Atur": body_organize,
+    "Perbaiki": lambda w, f, s: _single_file_body(
+        f, s, "Perbaiki & simpan", "success", pdf_ops.repair_pdf, tool="Perbaiki"),
+    "Crop": lambda w, f, s: _single_file_body(
+        f, s, "Crop halaman", "warning", pdf_ops.crop_pdf,
+        need_spec=True, need_extra=_crop_extra, tool="Crop"),
+    "Redact": lambda w, f, s: _single_file_body(
+        f, s, "Hitamkan permanen", "dark", pdf_ops.redact_text,
+        need_extra=_redact_extra, tool="Redact"),
+    "Teks": lambda w, f, s: _single_file_body(
+        f, s, "Sisipkan teks", "primary", pdf_ops.add_text,
+        need_spec=True, need_extra=_text_extra, tool="Teks"),
+    "Sign": body_sign,
+    "HTML→PDF": lambda w, f, s: _single_file_body(
+        f, s, "Convert HTML→PDF", "secondary", pdf_ops.html_to_pdf,
+        tool="HTML→PDF",
+        pick_types=(("HTML", "*.html *.htm"), ("Semua", "*.*")),
+        save_name="dari-html.pdf"),
+    "PDF→MD": lambda w, f, s: _single_file_body(
+        f, s, "Ekstrak ke Markdown", "secondary", pdf_ops.pdf_to_markdown,
+        tool="PDF→MD", save_name="hasil.md", save_ext=".md",
+        save_types=(("Markdown", "*.md"), ("Teks", "*.txt"))),
+    "Office→PDF": body_office,
 }
 
 
@@ -884,37 +1051,93 @@ def main():
         pass
     _splash(app)
 
-    # header: ikon + judul + status
+    app.title("NganuPDF — multitool PDF offline")
+    app.geometry("980x680")
+    app.minsize(820, 560)
+    try:  # ikon window (diabaikan bila file tak ada)
+        import tkinter as tk
+        ico_png = settings.resource_path(os.path.join("assets", "icon.png"))
+        if os.path.isfile(ico_png):
+            _ph = tk.PhotoImage(file=ico_png).subsample(8, 8)  # 256 -> 32
+            app.iconphoto(True, _ph)
+            app._icon_ref = _ph  # tahan dari GC
+    except Exception:
+        pass
+    _splash(app)
+
+    # ---- layout: sidebar + konten scroll ----
     import tkinter as tk
-    head = ttk.Frame(app, padding=(16, 14, 16, 2))
-    head.pack(fill="x")
+    NAVY, NAVY2 = "#141b33", "#1e2748"
+    COLS = 3
+    state = {"cat": "Semua", "q": ""}
     try:
-        _hico = tk.PhotoImage(file=ico_png).subsample(5, 5) if os.path.isfile(ico_png) else None
+        _hico = tk.PhotoImage(file=ico_png).subsample(6, 6) if os.path.isfile(ico_png) else None
     except Exception:
         _hico = None
-    if _hico is not None:
-        ttk.Label(head, image=_hico).pack(side="left", padx=(0, 12))
-        app._head_ref = _hico  # tahan dari GC
-    cap = ttk.Frame(head)
-    cap.pack(side="left", fill="x", expand=True)
-    ttk.Label(cap, text="NganuPDF", font=("Segoe UI", 20, "bold")).pack(anchor="w")
-    try:
-        st = ocr_ops.status()
-        ocr_txt = "OCR ✓ siap" if st["available"] else "OCR ✗ belum (lihat plugins/ocr-README.md)"
-    except Exception:
-        ocr_txt = "OCR ?"
-    ttk.Label(cap, text=f"100% offline • tanpa upload • {ocr_txt}",
-              font=("Segoe UI", 9)).pack(anchor="w")
-    ttk.Separator(app).pack(fill="x", padx=16, pady=(8, 0))
-    try:
-        _accent = app.style.colors.get("primary")
-    except Exception:
-        _accent = "#1f6feb"
-    tk.Frame(app, bg=_accent, height=2).pack(fill="x", padx=16, pady=(0, 2))
 
-    grid = ttk.Frame(app, padding=10)
+    body = ttk.Frame(app)
+    body.pack(fill="both", expand=True)
+    side = tk.Frame(body, bg=NAVY, width=216)
+    side.pack(side="left", fill="y")
+    side.pack_propagate(False)
+
+    brand = tk.Frame(side, bg=NAVY)
+    brand.pack(fill="x", padx=14, pady=(16, 4))
+    if _hico is not None:
+        tk.Label(brand, image=_hico, bg=NAVY).pack(side="left", padx=(0, 10))
+        app._head_ref = _hico
+    bt = tk.Frame(brand, bg=NAVY)
+    bt.pack(side="left")
+    tk.Label(bt, text="NganuPDF", font=("Segoe UI", 15, "bold"),
+             bg=NAVY, fg="white").pack(anchor="w")
+    try:
+        _st = ocr_ops.status()
+        _ocr = "OCR ✓" if _st["available"] else "OCR ✗"
+    except Exception:
+        _ocr = "OCR ?"
+    tk.Label(bt, text=f"offline • {_ocr}", font=("Segoe UI", 8),
+             bg=NAVY, fg="#8ea2d8").pack(anchor="w")
+
+    tk.Label(side, text="CARI TOOL", font=("Segoe UI", 8, "bold"),
+             bg=NAVY, fg="#8ea2d8").pack(anchor="w", padx=14, pady=(12, 2))
+    qvar = tk.StringVar()
+    qent = ttk.Entry(side, textvariable=qvar, width=24)
+    qent.pack(fill="x", padx=14)
+    tk.Label(side, text="KATEGORI", font=("Segoe UI", 8, "bold"),
+             bg=NAVY, fg="#8ea2d8").pack(anchor="w", padx=14, pady=(12, 2))
+    cat_btns = {}
+
+    sidebot = tk.Frame(side, bg=NAVY)
+    sidebot.pack(side="bottom", fill="x", padx=14, pady=12)
+    _theme_btn = ttk.Button(sidebot, text="🌙/☀ Tema", bootstyle="secondary",
+                            command=lambda: _theme())
+    _theme_btn.pack(fill="x", pady=(0, 6))
+    ttk.Button(sidebot, text="🧹 Bersihkan riwayat", bootstyle="secondary",
+               command=lambda: (recent.clear(), refresh_recent())).pack(fill="x")
+    tk.Label(sidebot, text="NganuPDF • 100% offline", font=("Segoe UI", 7),
+             bg=NAVY, fg="#5a6b9c").pack(pady=(8, 0))
+
+    content = ttk.Frame(body)
+    content.pack(side="left", fill="both", expand=True)
+    cv = tk.Canvas(content, highlightthickness=0)
+    sb = ttk.Scrollbar(content, orient="vertical", command=cv.yview)
+    cv.configure(yscrollcommand=sb.set)
+    sb.pack(side="right", fill="y")
+    cv.pack(side="left", fill="both", expand=True)
+    inner = ttk.Frame(cv)
+    cv.create_window((0, 0), window=inner, anchor="nw")
+    inner.bind("<Configure>", lambda _e: cv.configure(scrollregion=cv.bbox("all")))
+
+    def _wheel(ev):
+        cv.yview_scroll(-1 if ev.delta > 0 else 1, "units")
+    cv.bind("<Enter>", lambda _e: cv.bind_all("<MouseWheel>", _wheel))
+    cv.bind("<Leave>", lambda _e: cv.unbind_all("<MouseWheel>"))
+    cv.bind("<Button-4>", lambda _e: cv.yview_scroll(-1, "units"))
+    cv.bind("<Button-5>", lambda _e: cv.yview_scroll(1, "units"))
+
+    grid = ttk.Frame(inner, padding=12)
     grid.pack(fill="both", expand=True)
-    for i in range(4):
+    for i in range(COLS):
         grid.columnconfigure(i, weight=1)
 
     def _make_card(parent, icon, name, desc, style):
@@ -932,9 +1155,11 @@ def main():
         card.pack(fill="both", expand=True, padx=(0, 3), pady=(0, 3))
         strip = tk.Frame(card, bg=accent, height=4)
         strip.pack(fill="x")
-        ic = tk.Label(card, text=icon, font=("Segoe UI", 26), bg=base_bg, fg=accent)
-        ic = tk.Label(card, text=icon, font=("Segoe UI", 26), bg=base_bg, fg=accent)
-        ic.pack(pady=(12, 0))
+        badge = tk.Frame(card, bg=base_bg)
+        badge.pack(pady=(12, 2))
+        ic = tk.Label(badge, text=icon, font=("Segoe UI", 22), bg=accent,
+                      fg="white", width=3, pady=5)
+        ic.pack()
         nm = tk.Label(card, text=name, font=("Segoe UI", 11, "bold"), bg=base_bg, fg=name_fg)
         nm.pack()
         ds = tk.Label(card, text=desc, font=("Segoe UI", 8), bg=base_bg, fg="#8a8a8a")
@@ -942,32 +1167,62 @@ def main():
         orig_fg = {w: w.cget("fg") for w in (ic, nm, ds)}
 
         def _hover(on=True):
-            card.configure(bg=accent if on else base_bg)
+            bg = accent if on else base_bg
+            card.configure(bg=bg)
+            badge.configure(bg=bg)
             for wdg in (ic, nm, ds):
-                wdg.configure(bg=accent if on else base_bg,
+                wdg.configure(bg=bg if wdg is not ic else accent,
                               fg="#ffffff" if on else orig_fg[wdg])
 
         def _open(_e=None):
             _tool_window(app, name, BUILDERS[name])
 
-        for wdg in (card, strip, ic, nm, ds):
+        for wdg in (card, strip, badge, ic, nm, ds):
             wdg.bind("<Enter>", lambda e: _hover(on=True))
             wdg.bind("<Leave>", lambda e: _hover(on=False))
             wdg.bind("<Button-1>", _open)
         return shadow
 
-    for idx, (icon, name, desc, style) in enumerate(TOOLS):
-        _make_card(grid, icon, name, desc, style).grid(
-            row=idx // 4, column=idx % 4, padx=6, pady=6, sticky="nsew")
-        grid.rowconfigure(idx // 4, weight=1)
+    def _filtered():
+        q = state["q"].strip().lower()
+        return [t for t in TOOLS
+                if (state["cat"] == "Semua" or t[4] == state["cat"])
+                and (not q or q in t[1].lower() or q in t[2].lower())]
 
-    # riwayat hasil (portable, data/recent.json)
+    def _render_grid():
+        for w in grid.winfo_children():
+            w.destroy()
+        items = _filtered()
+        if not items:
+            ttk.Label(grid, text="Tidak ketemu. Coba kata lain.",
+                      font=("Segoe UI", 10)).grid(row=0, column=0, pady=20)
+        for idx, (icon, name, desc, style, _c) in enumerate(items):
+            _make_card(grid, icon, name, desc, style).grid(
+                row=idx // COLS, column=idx % COLS, padx=6, pady=6, sticky="nsew")
+        for r in range((len(items) + COLS - 1) // COLS):
+            grid.rowconfigure(r, weight=1)
+
+    def _select_cat(c):
+        state["cat"] = c
+        for name, b in cat_btns.items():
+            b.configure(bootstyle="primary" if name == c else "secondary-link")
+        _render_grid()
+
+    for c in CATS:
+        n = len(TOOLS) if c == "Semua" else sum(1 for t in TOOLS if t[4] == c)
+        b = ttk.Button(side, text=f"  {c}  ({n})", bootstyle="primary" if c == "Semua" else "secondary-link",
+                       command=lambda c=c: _select_cat(c))
+        b.pack(fill="x", padx=14, pady=2)
+        cat_btns[c] = b
+    qent.bind("<KeyRelease>", lambda _e: (state.update(q=qvar.get()), _render_grid()))
+    _render_grid()
+
+    # riwayat hasil (portable, data/recent.json) — di bawah grid, ikut scroll
     global _recent_lb
-    import tkinter as tk
-    rec_frm = ttk.Frame(app, padding=(10, 0))
+    rec_frm = ttk.Frame(inner, padding=(12, 0))
     rec_frm.pack(fill="x")
     ttk.Label(rec_frm, text="Terakhir diproses (klik 2x = buka folder):",
-              font=("Segoe UI", 9, "bold")).pack(anchor="w")
+              font=("Segoe UI", 10, "bold")).pack(anchor="w")
     _recent_lb = tk.Listbox(rec_frm, height=3, relief="flat",
                             font=("Segoe UI", 9),
                             bg="#1e1e1e" if _is_dark() else "#ffffff",
@@ -997,18 +1252,19 @@ def main():
             pass
     _recent_lb.bind("<Double-Button-1>", _open_recent)
 
-    # toggle tema
+    # toggle tema (di sidebar) — render ulang agar warna kartu ikut tema
     def _theme():
         ns = settings.load()
         ns["theme"] = "flatly" if ns.get("theme") == "darkly" else "darkly"
         settings.save(ns)
         app.style.theme_use(ns["theme"])
-    bot = ttk.Frame(app)
-    bot.pack(pady=(0, 10))
-    ttk.Button(bot, text="🌙/☀ Ganti tema", bootstyle="link",
-               command=_theme).pack(side="left", padx=8)
-    ttk.Button(bot, text="🧹 Bersihkan riwayat", bootstyle="link",
-               command=lambda: (recent.clear(), refresh_recent())).pack(side="left", padx=8)
+        dark = ns["theme"] != "flatly"
+        try:
+            _recent_lb.configure(bg="#1e1e1e" if dark else "#ffffff",
+                                 fg="#d4d4d4" if dark else "#212121")
+        except Exception:
+            pass
+        _render_grid()
     if os.environ.get("PDFTOOL_SMOKE"):
         # hook test headless: tutup otomatis agar binary bisa di-smoke-test
         app.after(3000, app.destroy)

@@ -2,6 +2,10 @@ NganuPDF v1.0 — CARA PAKAI (tanpa install apa pun)
 
 1. Extract zip ini ke folder mana saja (mis. D:\NganuPDF atau flashdisk).
 2. Dobel-klik NganuPDF.exe. Langsung jalan, tanpa install/admin/internet.
+   Jika Windows SmartScreen muncul ("Windows protected your PC"):
+   itu standar untuk app tanpa sertifikat berbayar — klik
+   "More info" -> "Run anyway". File ini bersih 100% offline
+   (cek hash SHA256 di halaman rilis GitHub bila perlu).
 3. Semua setting tersimpan di folder data\ sebelah exe (portable).
 
 OPSIONAL — OCR (PDF scan jadi teks):
