@@ -443,16 +443,28 @@ def body_organize(win, frm, say):
     from src.ui.widgets import run_async
 
     COLS, MAXW, CAP = 4, 140, 300
+    SRC_COLORS = ["#1f6feb", "#1a7f37", "#9e6a03", "#8957e5", "#cf222e", "#0a7ea4"]
     st = {"primary": "", "extras": [], "items": [], "snap": [],
           "sel": set(), "anchor": 0, "thumbs": {}, "drag": None}
     refs = []
 
     top = ttk.Frame(frm)
     top.pack(fill="x")
-    name_lbl = ttk.Label(top, text="Belum ada PDF", font=("Segoe UI", 9, "bold"))
+    name_lbl = ttk.Label(top, text="Belum ada PDF — pilih atau seret file ke sini",
+                         font=("Segoe UI", 9, "bold"))
     name_lbl.pack(side="left", fill="x", expand=True)
     cnt_lbl = ttk.Label(top, text="")
     cnt_lbl.pack(side="right")
+    legend = ttk.Label(frm, text="", font=("Segoe UI", 8), wraplength=520)
+    legend.pack(anchor="w")
+
+    def _legend():
+        if not st["primary"]:
+            legend.configure(text="")
+            return
+        parts = [f"[0] {os.path.basename(st['primary'])}"]
+        parts += [f"[{i + 1}] {os.path.basename(p)}" for i, p in enumerate(st["extras"])]
+        legend.configure(text="Sumber: " + "   ".join(parts))
 
     cv_box = ttk.Frame(frm)
     cv_box.pack(fill="both", expand=True, pady=4)
@@ -497,8 +509,10 @@ def body_organize(win, frm, say):
         if n > CAP:
             say(f"Preview dibatasi {CAP} halaman pertama (simpan tetap full).")
         for pos, (s, o, r) in enumerate(shown):
+            border = SRC_COLORS[s % len(SRC_COLORS)]
             cell = tk.Frame(inner, relief="sunken" if pos in st["sel"] else "groove",
-                            borderwidth=2,
+                            borderwidth=2, highlightthickness=2,
+                            highlightbackground="#ffffff" if pos in st["sel"] else border,
                             bg="#1f6feb" if pos in st["sel"] else None)
             cell.grid(row=pos // COLS, column=pos % COLS, padx=4, pady=4)
             im = st["thumbs"].get((s, o))
@@ -591,16 +605,22 @@ def body_organize(win, frm, say):
         st["items"] = [(0, i, 0) for i in range(n)]
         st["snap"] = list(st["items"])
         name_lbl.configure(text=f"{os.path.basename(p)} ({n} hal)")
+        _legend()
         say("Memuat thumbnail...")
         run_async(frm, _load_thumbs,
                   lambda _r: (refresh(), say("Siap. Seret thumbnail untuk susun ulang.")),
                   lambda e: say(f"Gagal: {e}"))
 
-    def add_more():
-        if not _need_file():
-            return
-        ps = filedialog.askopenfilenames(filetypes=[("PDF", "*.pdf")])
-        for p in ps:
+    def _add_paths(paths):
+        """Tambah halaman dari file lain (dipakai tombol + drop Explorer)."""
+        added = 0
+        for p in paths:
+            p = os.path.abspath(p)
+            if not p.lower().endswith(".pdf") or not os.path.isfile(p):
+                continue
+            if p in st["extras"] or p == st["primary"]:
+                say(f"Sudah ada: {os.path.basename(p)}.")
+                continue
             try:
                 n = pdf_ops.pdf_info(p)["pages"]
             except Exception as e:  # noqa: BLE001
@@ -609,9 +629,56 @@ def body_organize(win, frm, say):
             st["extras"].append(p)
             s = len(st["extras"])
             st["items"] += [(s, i, 0) for i in range(n)]
+            added += n
             say(f"+{n} hal dari {os.path.basename(p)}.")
-        st["snap"] = list(st["items"])
-        run_async(frm, _load_thumbs, lambda _r: refresh(), lambda e: say(f"Gagal: {e}"))
+        if added:
+            st["snap"] = list(st["items"])
+            _legend()
+            run_async(frm, _load_thumbs, lambda _r: refresh(), lambda e: say(f"Gagal: {e}"))
+        return added
+
+    def add_more():
+        if not _need_file():
+            return
+        _add_paths(filedialog.askopenfilenames(filetypes=[("PDF", "*.pdf")]))
+
+    def _on_drop(ev):
+        # Drop dari Explorer: file pertama jadi utama bila kosong,
+        # sisanya ditambah. Tanpa file utama, drop diabaikan berpesan.
+        try:
+            paths = [p.strip("{}") for p in win.splitlist(ev.data)]
+        except Exception:
+            return
+        pdfs = [p for p in paths if p.lower().endswith(".pdf") and os.path.isfile(p)]
+        if not pdfs:
+            return say("Seret file .pdf ke sini.")
+        if not st["primary"]:
+            first, rest = pdfs[0], pdfs[1:]
+            st.update(primary=os.path.abspath(first), extras=[], sel=set(), anchor=0)
+            try:
+                n = pdf_ops.pdf_info(first)["pages"]
+            except Exception as e:  # noqa: BLE001
+                st["primary"] = ""
+                return say(f"Gagal baca: {e}")
+            _remember(first)
+            st["items"] = [(0, i, 0) for i in range(n)]
+            st["snap"] = list(st["items"])
+            name_lbl.configure(text=f"{os.path.basename(first)} ({n} hal)")
+            _legend()
+            say("Memuat thumbnail...")
+            run_async(frm, _load_thumbs,
+                      lambda _r: (_add_paths(rest), refresh(),
+                                  say("Siap. Seret thumbnail untuk susun ulang.")),
+                      lambda e: say(f"Gagal: {e}"))
+        else:
+            _add_paths(pdfs)
+
+    try:  # aktif hanya bila root TkinterDnD (fallback: tombol tetap jalan)
+        from tkinterdnd2 import DND_FILES
+        win.drop_target_register(DND_FILES)
+        win.dnd_bind("<<Drop>>", _on_drop)
+    except Exception:
+        pass
 
     def rotate_sel(dgr):
         if not _need_file() or not st["sel"]:
@@ -770,7 +837,14 @@ def _splash(app):
 def main():
     import ttkbootstrap as ttk
     s = settings.load()
-    app = ttk.Window(themename=s.get("theme", "darkly"))
+    try:
+        # Root DnD agar drop file dari Explorer aktif (Merge, Img->PDF, Atur).
+        # Fallback ke Window biasa bila tkinterdnd2 tak ada.
+        from tkinterdnd2 import TkinterDnD
+        app = TkinterDnD.Tk()
+        app.style = ttk.Style(theme=s.get("theme", "darkly"))
+    except Exception:
+        app = ttk.Window(themename=s.get("theme", "darkly"))
     app.title("NganuPDF — multitool PDF offline")
     app.geometry("760x640")
     app.minsize(640, 480)
