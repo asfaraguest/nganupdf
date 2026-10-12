@@ -43,6 +43,27 @@ def _remember(path):
 _recent_lb = None  # diisi dashboard, dipakai refresh_recent()
 
 
+def _is_dark() -> bool:
+    try:
+        return settings.load().get("theme", "darkly") != "flatly"
+    except Exception:
+        return True
+
+
+def _tool_icon(name: str) -> str:
+    for icon, tname, _d, _s in TOOLS:
+        if tname == name:
+            return icon
+    return "⧉"
+
+
+def _tool_desc(name: str) -> str:
+    for _i, tname, desc, _s in TOOLS:
+        if tname == name:
+            return desc
+    return ""
+
+
 def refresh_recent():
     """Isi ulang listbox recent (aman dipanggil dari thread via after)."""
     if _recent_lb is None:
@@ -72,11 +93,27 @@ def _succeeded(tool, result_label, say, btn):
 def _tool_window(app, title, body_builder):
     import tkinter as tk
     win = tk.Toplevel(app)
-    win.title(title)
-    win.geometry("560x520")
-    win.minsize(480, 420)
-    log = tk.Text(win, height=6, state="disabled")
+    win.title(f"NganuPDF — {title}")
+    win.geometry("600x560")
+    win.minsize(500, 440)
     import ttkbootstrap as ttk
+
+    # header tool: ikon besar + judul + deskripsi
+    head = ttk.Frame(win, padding=(14, 12, 14, 4))
+    head.pack(fill="x")
+    tk.Label(head, text=_tool_icon(title), font=("Segoe UI", 26)).pack(side="left", padx=(0, 12))
+    cap = ttk.Frame(head)
+    cap.pack(side="left", fill="x", expand=True)
+    ttk.Label(cap, text=title, font=("Segoe UI", 14, "bold")).pack(anchor="w")
+    ttk.Label(cap, text=_tool_desc(title), font=("Segoe UI", 9)).pack(anchor="w")
+    ttk.Separator(win).pack(fill="x", padx=14, pady=(6, 2))
+
+    dark = _is_dark()
+    log = tk.Text(win, height=6, state="disabled", relief="flat",
+                  font=("Consolas", 9),
+                  bg="#1e1e1e" if dark else "#f4f4f4",
+                  fg="#d4d4d4" if dark else "#222222",
+                  insertbackground="#d4d4d4" if dark else "#222222")
 
     def say(msg):
         log.configure(state="normal")
@@ -84,10 +121,10 @@ def _tool_window(app, title, body_builder):
         log.see("end")
         log.configure(state="disabled")
 
-    frm = ttk.Frame(win, padding=10)
+    frm = ttk.Frame(win, padding=(14, 6, 14, 6))
     frm.pack(fill="both", expand=True)
     body_builder(win, frm, say)
-    log.pack(fill="x", padx=10, pady=(0, 10))
+    log.pack(fill="x", padx=14, pady=(4, 12))
     return win
 
 
@@ -702,20 +739,31 @@ BUILDERS = {
 
 
 def _splash(app):
-    """Splash ringan tanpa file tambahan (tutup otomatis ~1,2 dtk)."""
+    """Splash: ikon + nama + progressbar (tutup otomatis ~1,4 dtk)."""
     import tkinter as tk
+    import ttkbootstrap as ttk
     sp = tk.Toplevel(app)
     sp.overrideredirect(True)
-    w, h = 320, 150
+    w, h = 340, 210
     sp.geometry(f"{w}x{h}+{(sp.winfo_screenwidth() - w) // 2}+{(sp.winfo_screenheight() - h) // 2}")
     sp.configure(bg="#26418f")
+    try:
+        ico = settings.resource_path(os.path.join("assets", "icon.png"))
+        if os.path.isfile(ico):
+            _sp = tk.PhotoImage(file=ico).subsample(4, 4)  # 256 -> 64
+            tk.Label(sp, image=_sp, bg="#26418f").pack(pady=(18, 2))
+            sp._icon_ref = _sp  # noqa: SLF001 (tahan dari GC)
+    except Exception:
+        pass
     tk.Label(sp, text="NganuPDF", font=("Segoe UI", 18, "bold"),
-             bg="#26418f", fg="white").pack(pady=(28, 4))
-    tk.Label(sp, text="multitool PDF offline • v1.0", font=("Segoe UI", 10),
+             bg="#26418f", fg="white").pack()
+    tk.Label(sp, text="multitool PDF offline", font=("Segoe UI", 10),
              bg="#26418f", fg="#cfe0ff").pack()
-    tk.Label(sp, text="memuat...", font=("Segoe UI", 9, "italic"),
-             bg="#26418f", fg="#9db8e8").pack(pady=(10, 0))
-    sp.after(1200, sp.destroy)
+    pb = ttk.Progressbar(sp, mode="indeterminate", bootstyle="light",
+                         length=220)
+    pb.pack(pady=(12, 0))
+    pb.start(12)
+    sp.after(1400, sp.destroy)
     return sp
 
 
@@ -737,24 +785,71 @@ def main():
         pass
     _splash(app)
 
-    ttk.Label(app, text="NganuPDF", font=("Segoe UI", 16, "bold")).pack(pady=(12, 2))
+    # header: ikon + judul + status
+    import tkinter as tk
+    head = ttk.Frame(app, padding=(16, 14, 16, 2))
+    head.pack(fill="x")
+    try:
+        _hico = tk.PhotoImage(file=ico_png).subsample(5, 5) if os.path.isfile(ico_png) else None
+    except Exception:
+        _hico = None
+    if _hico is not None:
+        ttk.Label(head, image=_hico).pack(side="left", padx=(0, 12))
+        app._head_ref = _hico  # tahan dari GC
+    cap = ttk.Frame(head)
+    cap.pack(side="left", fill="x", expand=True)
+    ttk.Label(cap, text="NganuPDF", font=("Segoe UI", 20, "bold")).pack(anchor="w")
     try:
         st = ocr_ops.status()
         ocr_txt = "OCR ✓ siap" if st["available"] else "OCR ✗ belum (lihat plugins/ocr-README.md)"
     except Exception:
         ocr_txt = "OCR ?"
-    ttk.Label(app, text=f"100% offline • tanpa upload • {ocr_txt}").pack(pady=(0, 10))
+    ttk.Label(cap, text=f"100% offline • tanpa upload • {ocr_txt}",
+              font=("Segoe UI", 9)).pack(anchor="w")
+    ttk.Separator(app).pack(fill="x", padx=16, pady=(8, 2))
 
     grid = ttk.Frame(app, padding=10)
     grid.pack(fill="both", expand=True)
     for i in range(4):
         grid.columnconfigure(i, weight=1)
 
+    def _make_card(parent, icon, name, desc, style):
+        """Kartu tool custom: ikon besar + nama bold + deskripsi, hover glow."""
+        try:
+            accent = app.style.colors.get(style)
+        except Exception:
+            accent = "#1f6feb"
+        base_bg = app.style.lookup("TFrame", "background") or ("#2b2b2b" if _is_dark() else "#ffffff")
+        name_fg = "#f2f2f2" if _is_dark() else "#212121"
+        card = tk.Frame(parent, bg=base_bg, relief="flat", borderwidth=0,
+                        highlightthickness=1, highlightbackground=accent,
+                        cursor="hand2")
+        ic = tk.Label(card, text=icon, font=("Segoe UI", 26), bg=base_bg, fg=accent)
+        ic.pack(pady=(12, 0))
+        nm = tk.Label(card, text=name, font=("Segoe UI", 11, "bold"), bg=base_bg, fg=name_fg)
+        nm.pack()
+        ds = tk.Label(card, text=desc, font=("Segoe UI", 8), bg=base_bg, fg="#8a8a8a")
+        ds.pack(pady=(0, 12))
+        orig_fg = {w: w.cget("fg") for w in (ic, nm, ds)}
+
+        def _hover(on=True):
+            card.configure(bg=accent if on else base_bg)
+            for wdg in (ic, nm, ds):
+                wdg.configure(bg=accent if on else base_bg,
+                              fg="#ffffff" if on else orig_fg[wdg])
+
+        def _open(_e=None):
+            _tool_window(app, name, BUILDERS[name])
+
+        for wdg in (card, ic, nm, ds):
+            wdg.bind("<Enter>", lambda e: _hover(on=True))
+            wdg.bind("<Leave>", lambda e: _hover(on=False))
+            wdg.bind("<Button-1>", _open)
+        return card
+
     for idx, (icon, name, desc, style) in enumerate(TOOLS):
-        card = ttk.Button(
-            grid, text=f"{icon}\n{name}\n{desc}", bootstyle=f"{style}-outline",
-            command=lambda n=name: _tool_window(app, n, BUILDERS[n]))
-        card.grid(row=idx // 4, column=idx % 4, padx=6, pady=6, sticky="nsew", ipady=14)
+        _make_card(grid, icon, name, desc, style).grid(
+            row=idx // 4, column=idx % 4, padx=6, pady=6, sticky="nsew")
         grid.rowconfigure(idx // 4, weight=1)
 
     # riwayat hasil (portable, data/recent.json)
@@ -764,7 +859,12 @@ def main():
     rec_frm.pack(fill="x")
     ttk.Label(rec_frm, text="Terakhir diproses (klik 2x = buka folder):",
               font=("Segoe UI", 9, "bold")).pack(anchor="w")
-    _recent_lb = tk.Listbox(rec_frm, height=3)
+    _recent_lb = tk.Listbox(rec_frm, height=3, relief="flat",
+                            font=("Segoe UI", 9),
+                            bg="#1e1e1e" if _is_dark() else "#ffffff",
+                            fg="#d4d4d4" if _is_dark() else "#212121",
+                            selectbackground="#1f6feb", selectforeground="#ffffff",
+                            highlightthickness=1)
     _recent_lb.pack(fill="x", pady=(2, 4))
     refresh_recent()
 

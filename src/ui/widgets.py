@@ -54,7 +54,21 @@ def make_drop_listbox(parent, files_var_desc=""):
 
     files: list[str] = []
     frame = ttk.Frame(parent)
-    lb = tk.Listbox(frame, height=8, selectmode="extended")
+    try:
+        from src.core import settings as _st
+        _dark = _st.load().get("theme", "darkly") != "flatly"
+    except Exception:
+        try:
+            from core import settings as _st  # noqa: F401
+            _dark = _st.load().get("theme", "darkly") != "flatly"
+        except Exception:
+            _dark = True
+    lb = tk.Listbox(frame, height=8, selectmode="extended", relief="flat",
+                    font=("Segoe UI", 9),
+                    bg="#1e1e1e" if _dark else "#ffffff",
+                    fg="#d4d4d4" if _dark else "#212121",
+                    selectbackground="#1f6feb", selectforeground="#ffffff",
+                    highlightthickness=1)
     lb.pack(fill="both", expand=True)
 
     # drag-drop jika tkinterdnd2 tersedia
