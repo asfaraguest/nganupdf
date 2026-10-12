@@ -129,10 +129,28 @@ def _tool_window(app, title, body_builder):
 
 
 def _busy_btn(btn, busy=True):
+    """Kunci tombol saat proses + teks ⏳ agar jelas sedang bekerja."""
     try:
-        btn.configure(state="disabled" if busy else "normal")
+        if busy:
+            if not hasattr(btn, "_txt"):
+                btn._txt = btn.cget("text")  # type: ignore[attr-defined]
+            btn.configure(state="disabled", text="⏳ Memproses…", cursor="watch")
+        else:
+            btn.configure(state="normal", cursor="hand2")
+            if hasattr(btn, "_txt"):
+                btn.configure(text=btn._txt)  # type: ignore[attr-defined]
     except Exception:
-        pass
+        try:
+            btn.configure(state="disabled" if busy else "normal")
+        except Exception:
+            pass
+
+
+def _act_btn(parent, text, bootstyle="primary"):
+    """Tombol aksi utama yang konsisten: gemuk, pointer tangan."""
+    import ttkbootstrap as ttk
+    return ttk.Button(parent, text=text, bootstyle=bootstyle,
+                      padding=(14, 10), cursor="hand2")
 
 
 # ---------------------------------------------------------------- bodies
@@ -159,7 +177,7 @@ def body_merge(win, frm, say):
             say(f"Preview gagal: {e}")
     ttk.Button(frm, text="👁 Preview file pertama", bootstyle="link",
                command=preview).pack(anchor="e")
-    btn = ttk.Button(frm, text="Gabung → simpan PDF", bootstyle="primary")
+    btn = _act_btn(frm, "Gabung → simpan PDF", "primary")
     btn.pack(fill="x", pady=8)
 
     def go():
@@ -207,7 +225,7 @@ def body_split(win, frm, say):
     ttk.Entry(frm, textvariable=spec).pack(fill="x")
     prev_box = ttk.Frame(frm)
     prev_box.pack(fill="x", pady=4)
-    btn = ttk.Button(frm, text="Pecah → folder", bootstyle="success")
+    btn = _act_btn(frm, "Pecah → folder", "success")
     btn.pack(fill="x", pady=8)
 
     def go():
@@ -250,7 +268,7 @@ def _single_file_body(frm, say, btn_text, btn_style, fn, need_spec=False,
         ttk.Entry(frm, textvariable=spec_var).pack(fill="x")
     if need_extra:
         need_extra(frm, vals)
-    btn = ttk.Button(frm, text=btn_text, bootstyle=btn_style)
+    btn = _act_btn(frm, btn_text, btn_style)
     btn.pack(fill="x", pady=8)
 
     def go():
@@ -310,7 +328,7 @@ def body_pdf2img(win, frm, say):
     ttk.Entry(frm, textvariable=dpi).pack(fill="x")
     ttk.Label(frm, text="Format:").pack(anchor="w")
     ttk.Combobox(frm, textvariable=fmt, values=["png", "jpg"], state="readonly").pack(fill="x")
-    btn = ttk.Button(frm, text="Convert → folder", bootstyle="secondary")
+    btn = _act_btn(frm, "Convert → folder", "secondary")
     btn.pack(fill="x", pady=8)
 
     def go():
@@ -331,7 +349,7 @@ def body_img2pdf(win, frm, say):
     from src.ui.widgets import make_drop_listbox, run_async
     dz, lb, files = make_drop_listbox(frm)
     dz.pack(fill="both", expand=True)
-    btn = ttk.Button(frm, text="Jadikan PDF", bootstyle="primary")
+    btn = _act_btn(frm, "Jadikan PDF", "primary")
     btn.pack(fill="x", pady=8)
 
     def go():
@@ -416,7 +434,7 @@ def body_metadata(win, frm, say):
     for lab, var in (("Judul:", title), ("Penulis:", author), ("Subjek:", subject)):
         ttk.Label(frm, text=lab).pack(anchor="w")
         ttk.Entry(frm, textvariable=var).pack(fill="x")
-    btn = ttk.Button(frm, text="Simpan metadata", bootstyle="info")
+    btn = _act_btn(frm, "Simpan metadata", "info")
     btn.pack(fill="x", pady=8)
 
     def go():
@@ -510,9 +528,10 @@ def body_organize(win, frm, say):
             say(f"Preview dibatasi {CAP} halaman pertama (simpan tetap full).")
         for pos, (s, o, r) in enumerate(shown):
             border = SRC_COLORS[s % len(SRC_COLORS)]
+            base_hl = "#ffffff" if pos in st["sel"] else border
             cell = tk.Frame(inner, relief="sunken" if pos in st["sel"] else "groove",
                             borderwidth=2, highlightthickness=2,
-                            highlightbackground="#ffffff" if pos in st["sel"] else border,
+                            highlightbackground=base_hl, cursor="hand2",
                             bg="#1f6feb" if pos in st["sel"] else None)
             cell.grid(row=pos // COLS, column=pos % COLS, padx=4, pady=4)
             im = st["thumbs"].get((s, o))
@@ -535,12 +554,17 @@ def body_organize(win, frm, say):
                 wdg.bind("<ButtonPress-1>", lambda e, p=pos: _press(p, e))
                 wdg.bind("<B1-Motion>", _motion)
                 wdg.bind("<ButtonRelease-1>", lambda e, p=pos: _release(p, e))
+                wdg.bind("<Enter>", lambda e, c=cell, b=base_hl: c.configure(highlightbackground="#ffffff"))
+                wdg.bind("<Leave>", lambda e, c=cell, b=base_hl: c.configure(highlightbackground=b))
         # bind label anak juga
         for cell in inner.winfo_children():
+            _bh = cell.cget("highlightbackground")
             for ch in cell.winfo_children():
                 ch.bind("<ButtonPress-1>", lambda e, p=cell.grid_info()["row"] * COLS + cell.grid_info()["column"]: _press(p, e))
                 ch.bind("<B1-Motion>", _motion)
                 ch.bind("<ButtonRelease-1>", lambda e, p=cell.grid_info()["row"] * COLS + cell.grid_info()["column"]: _release(p, e))
+                ch.bind("<Enter>", lambda e, c=cell: c.configure(highlightbackground="#ffffff"))
+                ch.bind("<Leave>", lambda e, c=cell, b=_bh: c.configure(highlightbackground=b))
 
     def _press(pos, ev):
         # Catat saja; JANGAN refresh di sini (widget sedang di-drag akan hancur).
@@ -713,7 +737,7 @@ def body_organize(win, frm, say):
     ttk.Button(bar, text="⟳", width=4, command=lambda: rotate_sel(90)).pack(side="left", padx=2)
     ttk.Button(bar, text="✕ Hapus", command=delete_sel).pack(side="left", padx=4)
     ttk.Button(bar, text="↺ Reset", command=reset).pack(side="right")
-    btn = ttk.Button(frm, text="Simpan hasil → PDF", bootstyle="primary")
+    btn = _act_btn(frm, "Simpan hasil → PDF", "primary")
     btn.pack(fill="x", pady=6)
 
     def go():
@@ -763,7 +787,7 @@ def body_ocr(win, frm, say):
     ttk.Entry(frm, textvariable=lang).pack(fill="x")
     ttk.Label(frm, text="DPI render (200-400 disarankan):").pack(anchor="w")
     ttk.Entry(frm, textvariable=dpi).pack(fill="x")
-    btn = ttk.Button(frm, text="OCR → PDF searchable", bootstyle="info")
+    btn = _act_btn(frm, "OCR → PDF searchable", "info")
     btn.pack(fill="x", pady=8)
 
     def go():
@@ -806,29 +830,30 @@ BUILDERS = {
 
 
 def _splash(app):
-    """Splash: ikon + nama + progressbar (tutup otomatis ~1,4 dtk)."""
+    """Splash: ikon besar + nama + progressbar (tutup otomatis ~1,4 dtk)."""
     import tkinter as tk
     import ttkbootstrap as ttk
     sp = tk.Toplevel(app)
     sp.overrideredirect(True)
-    w, h = 340, 210
+    w, h = 360, 250
     sp.geometry(f"{w}x{h}+{(sp.winfo_screenwidth() - w) // 2}+{(sp.winfo_screenheight() - h) // 2}")
-    sp.configure(bg="#26418f")
+    sp.configure(bg="#1c2f6b")
+    tk.Frame(sp, bg="#4c8dff", height=5).pack(fill="x")
     try:
         ico = settings.resource_path(os.path.join("assets", "icon.png"))
         if os.path.isfile(ico):
-            _sp = tk.PhotoImage(file=ico).subsample(4, 4)  # 256 -> 64
-            tk.Label(sp, image=_sp, bg="#26418f").pack(pady=(18, 2))
+            _sp = tk.PhotoImage(file=ico).subsample(3, 3)  # 256 -> 85
+            tk.Label(sp, image=_sp, bg="#1c2f6b").pack(pady=(16, 2))
             sp._icon_ref = _sp  # noqa: SLF001 (tahan dari GC)
     except Exception:
         pass
-    tk.Label(sp, text="NganuPDF", font=("Segoe UI", 18, "bold"),
-             bg="#26418f", fg="white").pack()
-    tk.Label(sp, text="multitool PDF offline", font=("Segoe UI", 10),
-             bg="#26418f", fg="#cfe0ff").pack()
-    pb = ttk.Progressbar(sp, mode="indeterminate", bootstyle="light",
-                         length=220)
-    pb.pack(pady=(12, 0))
+    tk.Label(sp, text="NganuPDF", font=("Segoe UI", 22, "bold"),
+             bg="#1c2f6b", fg="white").pack()
+    tk.Label(sp, text="Multitool PDF • 100% offline", font=("Segoe UI", 10),
+             bg="#1c2f6b", fg="#cfe0ff").pack()
+    pb = ttk.Progressbar(sp, mode="indeterminate", bootstyle="info-striped",
+                         length=240)
+    pb.pack(pady=(14, 0))
     pb.start(12)
     sp.after(1400, sp.destroy)
     return sp
@@ -880,7 +905,12 @@ def main():
         ocr_txt = "OCR ?"
     ttk.Label(cap, text=f"100% offline • tanpa upload • {ocr_txt}",
               font=("Segoe UI", 9)).pack(anchor="w")
-    ttk.Separator(app).pack(fill="x", padx=16, pady=(8, 2))
+    ttk.Separator(app).pack(fill="x", padx=16, pady=(8, 0))
+    try:
+        _accent = app.style.colors.get("primary")
+    except Exception:
+        _accent = "#1f6feb"
+    tk.Frame(app, bg=_accent, height=2).pack(fill="x", padx=16, pady=(0, 2))
 
     grid = ttk.Frame(app, padding=10)
     grid.pack(fill="both", expand=True)
@@ -895,9 +925,14 @@ def main():
             accent = "#1f6feb"
         base_bg = app.style.lookup("TFrame", "background") or ("#2b2b2b" if _is_dark() else "#ffffff")
         name_fg = "#f2f2f2" if _is_dark() else "#212121"
-        card = tk.Frame(parent, bg=base_bg, relief="flat", borderwidth=0,
+        shadow = tk.Frame(parent, bg="#000000")
+        card = tk.Frame(shadow, bg=base_bg, relief="flat", borderwidth=0,
                         highlightthickness=1, highlightbackground=accent,
                         cursor="hand2")
+        card.pack(fill="both", expand=True, padx=(0, 3), pady=(0, 3))
+        strip = tk.Frame(card, bg=accent, height=4)
+        strip.pack(fill="x")
+        ic = tk.Label(card, text=icon, font=("Segoe UI", 26), bg=base_bg, fg=accent)
         ic = tk.Label(card, text=icon, font=("Segoe UI", 26), bg=base_bg, fg=accent)
         ic.pack(pady=(12, 0))
         nm = tk.Label(card, text=name, font=("Segoe UI", 11, "bold"), bg=base_bg, fg=name_fg)
@@ -915,11 +950,11 @@ def main():
         def _open(_e=None):
             _tool_window(app, name, BUILDERS[name])
 
-        for wdg in (card, ic, nm, ds):
+        for wdg in (card, strip, ic, nm, ds):
             wdg.bind("<Enter>", lambda e: _hover(on=True))
             wdg.bind("<Leave>", lambda e: _hover(on=False))
             wdg.bind("<Button-1>", _open)
-        return card
+        return shadow
 
     for idx, (icon, name, desc, style) in enumerate(TOOLS):
         _make_card(grid, icon, name, desc, style).grid(

@@ -54,6 +54,9 @@ def make_drop_listbox(parent, files_var_desc=""):
 
     files: list[str] = []
     frame = ttk.Frame(parent)
+    hint = ttk.Label(frame, text="💡 Seret & letakkan file di sini, atau pakai tombol di bawah:",
+                     font=("Segoe UI", 8))
+    hint.pack(anchor="w", pady=(0, 2))
     try:
         from src.core import settings as _st
         _dark = _st.load().get("theme", "darkly") != "flatly"
