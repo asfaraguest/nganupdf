@@ -1,0 +1,16 @@
+NganuPDF v1.0 — CARA PAKAI (tanpa install apa pun)
+
+1. Extract zip ini ke folder mana saja (mis. D:\NganuPDF atau flashdisk).
+2. Dobel-klik NganuPDF.exe. Langsung jalan, tanpa install/admin/internet.
+3. Semua setting tersimpan di folder data\ sebelah exe (portable).
+
+OPSIONAL — OCR (PDF scan jadi teks):
+  Ikuti plugins\ocr-README.md (copy tesseract.exe + tessdata ke plugins\tesseract\).
+
+Isi folder:
+  NganuPDF.exe  = aplikasinya
+  _internal\    = pustaka bawaan (jangan dihapus/dipindah terpisah)
+  data\         = setting & riwayat (otomatis dibuat)
+  plugins\      = plugin opsional (OCR)
+
+100% offline. Kode sumber: https://github.com/asfaraguest/pdftool-portable

@@ -11,7 +11,7 @@ def resource_path(rel: str) -> str:
 
 
 def _root() -> str:
-    # src/core/settings.py -> pdf-tool/
+    # src/core/settings.py -> repo root (nganupdf/)
     here = os.path.dirname(os.path.abspath(__file__))
     if getattr(sys, "frozen", False):
         return os.path.dirname(os.path.abspath(sys.executable))

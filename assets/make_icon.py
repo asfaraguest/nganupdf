@@ -31,8 +31,8 @@ def main():
     d.rounded_rectangle([28, 20, 228, 90], radius=28, fill=(56, 120, 210, 255))
     d.rounded_rectangle([28, 62, 228, 90], radius=0, fill=(56, 120, 210, 255))
     d.rectangle([120, 20, 160, 90], fill=(200, 220, 245, 255))
-    d.text((52, 108), "PDF", font=_font(56), fill=(255, 255, 255, 255))
-    d.rectangle([52, 180, 204, 192], fill=(255, 255, 255, 220))
+    d.text((72, 96), "N", font=_font(96), fill=(255, 255, 255, 255))
+    d.rectangle([52, 196, 204, 206], fill=(255, 255, 255, 220))
     d.rectangle([52, 200, 160, 210], fill=(255, 255, 255, 160))
     im.save(os.path.join(HERE, "icon.png"))
     im.save(os.path.join(HERE, "icon.ico"),

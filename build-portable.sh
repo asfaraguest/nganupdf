@@ -5,7 +5,7 @@ set -e
 cd "$(dirname "$0")"
 pip install --break-system-packages -q -r requirements.txt 2>/dev/null || pip install -q -r requirements.txt
 python -m PyInstaller --noconfirm --clean \
-  --name PDFTool \
+  --name NganuPDF \
   --onedir --noconsole \
   --strip \
   --icon assets\icon.ico \
@@ -15,4 +15,4 @@ python -m PyInstaller --noconfirm --clean \
   --hidden-import PIL._tkinter_finder \
   --add-data "assets:assets" \
   src/main.py
-echo "OK -> dist/PDFTool/ (data/ dibuat otomatis saat jalan). Zip folder itu untuk portable."
+echo "OK -> dist/NganuPDF/ (data/ dibuat otomatis saat jalan). Zip folder itu untuk portable."

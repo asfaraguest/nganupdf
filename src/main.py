@@ -1,4 +1,4 @@
-"""PDFTool Portable — dashboard grid ala PDF24 (tkinter + ttkbootstrap)."""
+"""NganuPDF — dashboard grid ala PDF24 (tkinter + ttkbootstrap)."""
 import os
 import sys
 
@@ -477,7 +477,7 @@ def _splash(app):
     w, h = 320, 150
     sp.geometry(f"{w}x{h}+{(sp.winfo_screenwidth() - w) // 2}+{(sp.winfo_screenheight() - h) // 2}")
     sp.configure(bg="#26418f")
-    tk.Label(sp, text="⧉ PDFTool Portable", font=("Segoe UI", 16, "bold"),
+    tk.Label(sp, text="NganuPDF", font=("Segoe UI", 18, "bold"),
              bg="#26418f", fg="white").pack(pady=(28, 4))
     tk.Label(sp, text="multitool PDF offline • v1.0", font=("Segoe UI", 10),
              bg="#26418f", fg="#cfe0ff").pack()
@@ -491,7 +491,7 @@ def main():
     import ttkbootstrap as ttk
     s = settings.load()
     app = ttk.Window(themename=s.get("theme", "darkly"))
-    app.title("PDFTool Portable — multitool PDF offline")
+    app.title("NganuPDF — multitool PDF offline")
     app.geometry("760x640")
     app.minsize(640, 480)
     try:  # ikon window (diabaikan bila file tak ada)
@@ -505,7 +505,7 @@ def main():
         pass
     _splash(app)
 
-    ttk.Label(app, text="PDFTool Portable", font=("Segoe UI", 16, "bold")).pack(pady=(12, 2))
+    ttk.Label(app, text="NganuPDF", font=("Segoe UI", 16, "bold")).pack(pady=(12, 2))
     try:
         st = ocr_ops.status()
         ocr_txt = "OCR ✓ siap" if st["available"] else "OCR ✗ belum (lihat plugins/ocr-README.md)"

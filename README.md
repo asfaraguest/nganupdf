@@ -1,4 +1,7 @@
-# PDFTool Portable — multitool PDF offline ala PDF24
+# NganuPDF — multitool PDF offline ala PDF24
+
+> Sejak v1.0.2 proyek ini bernama **NganuPDF** (sebelumnya PDFTool —
+> rilis v1.0.0/v1.0.1 masih memakai nama lama).
 
 Techstack minimal: **Python + PyMuPDF + Pillow + tkinter + ttkbootstrap + tkinterdnd2**.
 Tanpa Node, tanpa Rust, tanpa server. 100% offline.
@@ -7,12 +10,12 @@ Tanpa Node, tanpa Rust, tanpa server. 100% offline.
 
 1. Install Python 3.12 + centang `tcl/tk`.
 2. `pip install -r requirements.txt`
-3. `py src/main.py` — atau dobel-klik `PDFTool.exe` hasil build.
+3. `py src/main.py` — atau dobel-klik `NganuPDF.exe` hasil build.
 
 ## Build .exe portable (di PC Windows)
 
-Klik 2x `build-windows.bat`, hasil: `dist\PDFTool\PDFTool.exe` + ikon.
-Folder `dist\PDFTool` + `data\` + `plugins\` = paket portable siap-zip.
+Klik 2x `build-windows.bat`, hasil: `dist\NganuPDF\NganuPDF.exe` + ikon.
+Folder `dist\NganuPDF` + `data\` + `plugins\` = paket portable siap-zip.
 Tips kecilkan hasil: di Windows UPX aktif default bila `upx.exe` ada di PATH.
 
 ## Cross-build .exe dari Linux (terbukti jalan, 2026-10-12)
@@ -22,7 +25,7 @@ PyInstaller tidak cross-compile, jadi dipakai **Wine 11 + Python Windows**:
 Kron4ek Wine portable + `python-3.12.10-amd64.exe /quiet` + PyInstaller
 `--onedir --noconsole`. Smoke-test + screenshot dashboard OK di bawah
 `xvfb`+Wine. Ulangi: pasang Wine 64-bit → install Python Windows + pip deps
-→ copy proyek ke `C:\pdf-tool` → jalankan perintah yang sama seperti
+→ copy proyek ke `C:\nganupdf` → jalankan perintah yang sama seperti
 `build-windows.bat` via `wine cmd /c`.
 
 ## Build Linux (terbukti jalan di sini)
@@ -44,7 +47,7 @@ Protect, Unlock, **OCR → PDF searchable (plugin opsional)**.
 
 ## Portable
 
-- `build-portable.sh` → `dist/PDFTool/` → zip → colok USB.
+- `build-portable.sh` → `dist/NganuPDF/` → zip → colok USB.
 - Settings di `data/settings.json` sebelah exe (bukan %APPDATA%).
 - OCR: isi `plugins/tesseract/` + `tessdata ind+eng` sesuai `plugins/ocr-README.md`
   (±14MB). Tanpa itu 12 tool lain tetap jalan; badge dashboard `OCR ✗/✓`.
