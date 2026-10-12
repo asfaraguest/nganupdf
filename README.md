@@ -12,7 +12,7 @@ OCR (plugin opsional).
 
 ## Pakai (Windows)
 
-1. Unduh zip dari [Releases](https://github.com/asfaraguest/pdftool-portable/releases), extract.
+1. Unduh zip dari [Releases](https://github.com/asfaraguest/nganupdf/releases), extract.
 2. Dobel-klik `NganuPDF.exe`.
 
 Setting tersimpan di folder `data\` sebelah exe. Untuk OCR,

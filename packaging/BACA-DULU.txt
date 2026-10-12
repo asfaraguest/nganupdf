@@ -13,4 +13,4 @@ Isi folder:
   data\         = setting & riwayat (otomatis dibuat)
   plugins\      = plugin opsional (OCR)
 
-100% offline. Kode sumber: https://github.com/asfaraguest/pdftool-portable
+100% offline. Kode sumber: https://github.com/asfaraguest/nganupdf
