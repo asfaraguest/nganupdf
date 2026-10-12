@@ -1,0 +1,10 @@
+__pycache__/
+*.pyc
+tests/tmp/
+tests/__pycache__/
+dist/
+dist-win/
+build/
+*.spec
+data/settings.json
+data/recent.json
