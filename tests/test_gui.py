@@ -1,4 +1,4 @@
-"""Test GUI headless (butuh xvfb): buka dashboard + ke-22 tool window,
+"""Test GUI headless (butuh xvfb): buka dashboard + ke-30 tool window,
 plus alur fungsional Atur Halaman (pilih PDF, klik seleksi, drag pindah).
 
 Jalankan: source dev-env.sh && xvfb-run -a python3 tests/test_gui.py
@@ -21,7 +21,7 @@ def main():
     import ttkbootstrap as ttk
     app = ttk.Window(themename="darkly")
     app.withdraw()
-    assert len(M.TOOLS) == 22, f"kartu dashboard {len(M.TOOLS)} != 22"
+    assert len(M.TOOLS) == 30, f"kartu dashboard {len(M.TOOLS)} != 30"
     assert set(M.BUILDERS) == {t[1] for t in M.TOOLS}, "BUILDERS vs TOOLS tidak sinkron"
 
     msgs = []

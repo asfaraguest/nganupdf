@@ -12,6 +12,9 @@ python -m PyInstaller --noconfirm --clean \
   --exclude-module numpy --exclude-module scipy --exclude-module pandas \
   --exclude-module matplotlib --exclude-module IPython --exclude-module tkinter.test \
   --collect-submodules pymupdf \
+  --collect-submodules docx \
+  --collect-submodules pptx \
+  --collect-submodules openpyxl \
   --hidden-import PIL._tkinter_finder \
   --add-data "assets:assets" \
   src/main.py

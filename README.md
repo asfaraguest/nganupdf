@@ -3,13 +3,21 @@
 Multitool PDF offline ala PDF24. Python + tkinter + PyMuPDF.
 Tanpa install, tanpa internet.
 
-## Fitur (22 tool, cari + filter kategori di sidebar)
+## Fitur (30 tool, cari + filter kategori di sidebar)
 
 Susun: Merge, Split, Atur Halaman (drag-drop antar-file), Hapus/Extract.
-Edit: Rotate, Crop, Watermark, Teks, Nomor, Metadata, Redact, Sign.
-Konversi: Compress, Gambar→PDF, PDF→Gambar, HTML→PDF, PDF→Markdown,
-Office→PDF (via MS Office), OCR (plugin).
-Keamanan: Protect, Unlock. Perbaiki: Repair PDF rusak.
+Edit: Rotate, Crop, Watermark, Teks, Nomor, Metadata, Redact, Sign, Form
+(isi/daftar kolom AcroForm).
+Konversi: Compress, Gambar→PDF, Scan→PDF, PDF→Gambar, Ambil Gambar
+(ekstrak gambar tertanam), HTML→PDF, PDF→Markdown, Office→PDF (via
+MS Office), OCR (plugin), PDF→Word (.docx), PDF→PowerPoint (.pptx),
+PDF→Excel (.xlsx), PDF→PDF/A (via Ghostscript bila ada).
+Keamanan: Protect, Unlock. Perbaiki: Repair PDF rusak, Banding
+(bandingkan 2 PDF berdampingan + sorot beda).
+
+Semua ala iLovePDF tapi 100% lokal: PDF→Word/PPT/Excel pakai python-docx,
+python-pptx, openpyxl (tanpa internet); PDF/A pakai Ghostscript bila
+tersedia, jika tidak hasil best-effort.
 
 ## Pakai (Windows)
 
@@ -38,6 +46,6 @@ bash build-portable.sh  # di Linux  -> dist/NganuPDF
 
 ## Ukuran & privasi
 
-Folder hasil build ±80–100MB (paling besar PyMuPDF), zip ±39MB.
+Folder hasil build ±100MB (terbesar PyMuPDF + lxml), zip ±46MB.
 100% offline: tidak ada kode jaringan di `src/`, tanpa telemetri,
 tanpa update otomatis, tanpa upload file ke mana pun.

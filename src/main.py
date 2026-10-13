@@ -4,7 +4,7 @@ import sys
 
 sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)), ".."))
 
-from src.core import ocr_ops, pdf_ops, recent, settings  # noqa: E402
+from src.core import convert_ops, ocr_ops, pdf_ops, recent, settings  # noqa: E402
 
 TOOLS = [
     # ikon, nama, deskripsi, warna, kategori
@@ -27,9 +27,17 @@ TOOLS = [
     ("📝", "PDF→MD", "PDF jadi Markdown", "secondary", "Konversi"),
     ("🏢", "Office→PDF", "Word/Excel/PPT via MS Office", "warning", "Konversi"),
     ("👁", "OCR", "Scan jadi teks", "info", "Konversi"),
+    ("📘", "PDF→Word", "PDF jadi Word (.docx)", "primary", "Konversi"),
+    ("📽", "PDF→PPT", "PDF jadi PowerPoint", "warning", "Konversi"),
+    ("📗", "PDF→Excel", "PDF jadi Excel (.xlsx)", "success", "Konversi"),
+    ("🏛", "PDF→PDF/A", "Arsip jangka panjang", "secondary", "Konversi"),
+    ("🗃", "Ambil Gambar", "Ekstrak gambar dari PDF", "info", "Konversi"),
+    ("📷", "Scan→PDF", "Foto jadi PDF rapi", "dark", "Konversi"),
+    ("🧾", "Form", "Isi/daftar kolom formulir", "info", "Edit"),
     ("🔒", "Protect", "Kunci password", "warning", "Keamanan"),
     ("🔓", "Unlock", "Buka kunci", "success", "Keamanan"),
     ("🔧", "Perbaiki", "Betulkan PDF rusak", "success", "Perbaiki"),
+    ("🔍", "Banding", "Bandingkan 2 PDF", "warning", "Perbaiki"),
 ]
 
 CATS = ["Semua", "Susun", "Edit", "Konversi", "Keamanan", "Perbaiki"]
@@ -957,6 +965,188 @@ def body_ocr(win, frm, say):
     btn.configure(command=go)
 
 
+def body_extract_img(win, frm, say):
+    import ttkbootstrap as ttk
+    from tkinter import filedialog
+    from src.core import convert_ops
+    from src.ui.widgets import run_async
+    src = {"p": ""}
+    row = ttk.Frame(frm)
+    row.pack(fill="x")
+    lbl = ttk.Label(row, text="Belum ada file")
+    lbl.pack(side="left", fill="x", expand=True)
+
+    def pick():
+        p = filedialog.askopenfilename(filetypes=[("PDF", "*.pdf")])
+        if p:
+            src["p"] = p
+            _remember(p)
+            lbl.configure(text=os.path.basename(p))
+    ttk.Button(row, text="Pilih PDF", command=pick).pack(side="right")
+    btn = _act_btn(frm, "Ekstrak → folder", "info")
+    btn.pack(fill="x", pady=8)
+
+    def go():
+        if not src["p"]:
+            return say("Pilih PDF dulu.")
+        d = filedialog.askdirectory() or os.path.dirname(src["p"])
+        _busy_btn(btn)
+        say("Mengekstrak gambar...")
+        run_async(frm, lambda: convert_ops.extract_images(src["p"], d),
+                  lambda r: (_succeeded("Ambil Gambar", d, say, btn),
+                             say(f"Total {len(r)} gambar di: {d}")),
+                  lambda e: (say(f"Gagal: {e}"), _busy_btn(btn, False)))
+    btn.configure(command=go)
+
+
+def body_compare(win, frm, say):
+    import tkinter as tk
+    import ttkbootstrap as ttk
+    from tkinter import filedialog
+    from src.core import convert_ops
+    from src.ui.widgets import run_async
+    src = {"a": "", "b": ""}
+    for key, cap in (("a", "PDF lama"), ("b", "PDF baru")):
+        row = ttk.Frame(frm)
+        row.pack(fill="x", pady=2)
+        lbl = ttk.Label(row, text=f"{cap}: belum ada")
+        lbl.pack(side="left", fill="x", expand=True)
+
+        def _pick(k=key, l=lbl, c=cap):
+            p = filedialog.askopenfilename(filetypes=[("PDF", "*.pdf")])
+            if p:
+                src[k] = p
+                _remember(p)
+                l.configure(text=f"{c}: {os.path.basename(p)}")
+        ttk.Button(row, text="Pilih", command=_pick).pack(side="right")
+    dpi = tk.IntVar(value=100)
+    ttk.Label(frm, text="DPI render (50-200):").pack(anchor="w", pady=(6, 0))
+    ttk.Entry(frm, textvariable=dpi).pack(fill="x")
+    btn = _act_btn(frm, "Bandingkan → PDF", "warning")
+    btn.pack(fill="x", pady=8)
+
+    def _done(r):
+        _succeeded("Banding", r["output"], say, btn)
+        c = r["changed"]
+        say(f"{r['pages']} halaman dibanding; {len(c)} beda" +
+            (f": hal {c}" if c else "."))
+    def go():
+        if not src["a"] or not src["b"]:
+            return say("Pilih dua PDF dulu.")
+        out = _ask_out("banding.pdf")
+        if not out:
+            return
+        _remember(out)
+        _busy_btn(btn)
+        say("Membandingkan...")
+        run_async(frm, lambda: convert_ops.compare_pdfs(
+            src["a"], src["b"], out, int(dpi.get())),
+            _done, lambda e: (say(f"Gagal: {e}"), _busy_btn(btn, False)))
+    btn.configure(command=go)
+
+
+def body_form(win, frm, say):
+    import tkinter as tk
+    import ttkbootstrap as ttk
+    from tkinter import filedialog
+    from src.core import convert_ops
+    from src.ui.widgets import run_async
+    src = {"p": ""}
+    row = ttk.Frame(frm)
+    row.pack(fill="x")
+    lbl = ttk.Label(row, text="Belum ada file")
+    lbl.pack(side="left", fill="x", expand=True)
+
+    fields_box = ttk.Frame(frm)
+    fields_box.pack(fill="both", expand=True, pady=4)
+    cv = tk.Canvas(fields_box, highlightthickness=0)
+    sb = ttk.Scrollbar(fields_box, orient="vertical", command=cv.yview)
+    cv.configure(yscrollcommand=sb.set)
+    sb.pack(side="right", fill="y")
+    cv.pack(side="left", fill="both", expand=True)
+    inner = ttk.Frame(cv)
+    cv.create_window((0, 0), window=inner, anchor="nw")
+    inner.bind("<Configure>", lambda _e: cv.configure(scrollregion=cv.bbox("all")))
+    entries: dict = {}
+
+    def load(p):
+        for w in inner.winfo_children():
+            w.destroy()
+        entries.clear()
+        try:
+            fields = convert_ops.list_form_fields(p)
+        except Exception as e:  # noqa: BLE001
+            return say(f"Gagal baca formulir: {e}")
+        if not fields:
+            ttk.Label(inner, text="Tidak ada kolom formulir (AcroForm) di PDF ini."
+                      ).pack(anchor="w")
+            return say("Tidak ada kolom formulir.")
+        say(f"{len(fields)} kolom ditemukan.")
+        for f in fields:
+            r = ttk.Frame(inner)
+            r.pack(fill="x", pady=1)
+            ttk.Label(r, text=f"{f['name']} ({f['type']})", width=26).pack(side="left")
+            var = tk.StringVar(value="" if f["value"] is None else str(f["value"]))
+            ttk.Entry(r, textvariable=var).pack(side="left", fill="x", expand=True)
+            entries[f["name"]] = var
+
+    def pick():
+        p = filedialog.askopenfilename(filetypes=[("PDF", "*.pdf")])
+        if p:
+            src["p"] = p
+            _remember(p)
+            lbl.configure(text=os.path.basename(p))
+            load(p)
+    ttk.Button(row, text="Pilih PDF", command=pick).pack(side="right")
+    btn = _act_btn(frm, "Simpan formulir terisi", "info")
+    btn.pack(fill="x", pady=6)
+
+    def go():
+        if not src["p"]:
+            return say("Pilih PDF dulu.")
+        out = _ask_out("terisi.pdf")
+        if not out:
+            return
+        _remember(out)
+        _busy_btn(btn)
+        say("Menyimpan...")
+        values = {name: v.get() for name, v in entries.items()}
+        run_async(frm, lambda: convert_ops.fill_form(src["p"], out, values),
+                  lambda r: (_succeeded("Form", r["output"], say, btn),
+                             say(f"{r['filled']} kolom diisi.")),
+                  lambda e: (say(f"Gagal: {e}"), _busy_btn(btn, False)))
+    btn.configure(command=go)
+
+
+def body_scan(win, frm, say):
+    import tkinter as tk
+    import ttkbootstrap as ttk
+    from src.core import convert_ops
+    from src.ui.widgets import make_drop_listbox, run_async
+    dz, lb, files = make_drop_listbox(frm)
+    dz.pack(fill="both", expand=True)
+    gray = tk.BooleanVar(value=True)
+    ttk.Checkbutton(frm, text="Mode hitam-putih + kontras (scan dokumen)",
+                    variable=gray).pack(anchor="w", pady=4)
+    btn = _act_btn(frm, "Jadikan PDF scan", "dark")
+    btn.pack(fill="x", pady=8)
+
+    def go():
+        if not files:
+            return say("Tambahkan gambar dulu.")
+        out = _ask_out("scan.pdf")
+        if not out:
+            return
+        _remember(out)
+        _busy_btn(btn)
+        say("Memproses scan...")
+        run_async(frm, lambda: convert_ops.images_to_pdf_scan(
+            list(files), out, gray=bool(gray.get())),
+            lambda r: _succeeded("Scan→PDF", r, say, btn),
+            lambda e: (say(f"Gagal: {e}"), _busy_btn(btn, False)))
+    btn.configure(command=go)
+
+
 BUILDERS = {
     "Merge": body_merge, "Split": body_split,
     "Rotate": lambda w, f, s: _single_file_body(
@@ -995,6 +1185,25 @@ BUILDERS = {
         tool="PDF→MD", save_name="hasil.md", save_ext=".md",
         save_types=(("Markdown", "*.md"), ("Teks", "*.txt"))),
     "Office→PDF": body_office,
+    "PDF→Word": lambda w, f, s: _single_file_body(
+        f, s, "Convert → Word", "primary", convert_ops.pdf_to_word,
+        tool="PDF→Word", save_name="hasil.docx", save_ext=".docx",
+        save_types=(("Word", "*.docx"),)),
+    "PDF→PPT": lambda w, f, s: _single_file_body(
+        f, s, "Convert → PowerPoint", "warning", convert_ops.pdf_to_powerpoint,
+        tool="PDF→PPT", save_name="hasil.pptx", save_ext=".pptx",
+        save_types=(("PowerPoint", "*.pptx"),)),
+    "PDF→Excel": lambda w, f, s: _single_file_body(
+        f, s, "Convert → Excel", "success", convert_ops.pdf_to_excel,
+        tool="PDF→Excel", save_name="hasil.xlsx", save_ext=".xlsx",
+        save_types=(("Excel", "*.xlsx"),)),
+    "PDF→PDF/A": lambda w, f, s: _single_file_body(
+        f, s, "Jadikan PDF/A", "secondary", convert_ops.to_pdfa,
+        tool="PDF→PDF/A", save_name="arsip-pdfa.pdf"),
+    "Ambil Gambar": body_extract_img,
+    "Scan→PDF": body_scan,
+    "Form": body_form,
+    "Banding": body_compare,
 }
 
 
